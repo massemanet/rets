@@ -48,7 +48,8 @@ handle_call(state,_From,State) ->
 handle_call(stop,_From,State) ->
   {stop,normal,stopping,State};
 handle_call(What,_From,State) ->
-  {reply,What,State}.
+  {Reply,S} = do_handle_call(What,State),
+  {reply,Reply,S}.
 
 handle_cast(What,State) ->
   erlang:display({cast,What}),
@@ -74,3 +75,27 @@ expand_recs(Tup) when is_tuple(Tup) ->
   end;
 expand_recs(Term) ->
   Term.
+
+do_handle_call({create,Tab},S) ->
+  ets:new(Tab,[named_table,ordered_set]),
+  {ok,S#state{tables=[Tab|S#state.tables]}};
+do_handle_call({delete,Tab},S) ->
+  ets:delete(Tab),
+  {ok,S#state{tables=[S#state.tables]--[Tab]}};
+do_handle_call({list,Tab},S) ->
+  L = rectify(ets:tab2list(Tab)),
+  {L,S};
+do_handle_call({insert,Tab,K,V},S) ->
+  ets:insert(Tab,{K,V}),
+  {ok,S};
+do_handle_call({get,Tab,Key},S) ->
+  A = rectify(ets:lookup(Tab,Key)),
+  {A,S};
+do_handle_call({delete,Tab,Key},S) ->
+  ets:delete(Tab,Key),
+  {ok,S};
+do_handle_call(What,State) ->
+  {What,State}.
+
+rectify(Term) ->
+  lists:flatten(io_lib:fwrite("~w",[Term])).
