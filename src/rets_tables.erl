@@ -87,9 +87,19 @@ do_handle_call(What,State) ->
   {What,State}.
 
 assert_created(Tab,S = #state{tables=Ts,props=Ps}) ->
-  [ets:new(list_to_atom(Tab),Ps) || not lists:member(Tab,Ts)],
-  S#state{tables=(S#state.tables--[Tab])++[Tab]}.
+  case lists:member(Tab,Ts) of
+    true ->
+      S;
+    false->
+      ets:new(list_to_atom(Tab),Ps),
+      S#state{tables=S#state.tables++[Tab]}
+  end.
 
 assert_deleted(Tab,S = #state{tables=Ts}) ->
-  [ets:delete(list_to_atom(Tab)) || lists:member(Tab,Ts)],
-  S#state{tables=S#state.tables--[Tab]}.
+  case lists:member(Tab,Ts) of
+    true ->
+      ets:delete(list_to_atom(Tab)),
+      S#state{tables=S#state.tables--[Tab]};
+    false->
+      S
+  end.
