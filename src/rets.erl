@@ -62,20 +62,13 @@ do(Act,Req) ->
   end.
 
 icall({list,Tab}) ->
-  enforce_created(Tab),
-  ets:tab2list(Tab);
+  ets:tab2list(list_to_existing_atom(Tab));
 icall({insert,Tab,K,V}) ->
-  enforce_created(Tab),
-  ets:insert(Tab,{K,V});
+  ets:insert(list_to_existing_atom(Tab),{K,V});
 icall({get,Tab,Key}) ->
-  enforce_created(Tab),
-  ets:lookup(Tab,Key);
+  ets:lookup(list_to_existing_atom(Tab),Key);
 icall({delete,Tab,Key}) ->
-  enforce_created(Tab),
-  ets:delete(Tab,Key).
-
-enforce_created(Tab) ->
-  [exit(nonexisting) || ets:info(Tab,size) =/= undefined].
+  ets:delete(list_to_existing_atom(Tab),Key).
 
 gcall(What) ->
   gen_server:call(rets_tables,What).

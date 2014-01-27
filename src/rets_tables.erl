@@ -19,7 +19,8 @@
          handle_call/3,handle_cast/2,handle_info/2]).
 
 %% declare the state
--record(state,{tables = []}).
+-record(state,{tables = [],
+               props = [named_table,ordered_set,public]}).
 
 %% add all records here, to kludge around the record kludge.
 rec_info(state) -> record_info(fields,state);
@@ -77,17 +78,16 @@ expand_recs(Term) ->
   Term.
 
 do_handle_call({create,Tab},S) ->
-  assert_deleted(Tab),
-  assert_created(Tab),
-  {ok,S#state{tables=[Tab|S#state.tables]}};
+  {ok,assert_created(Tab,assert_deleted(Tab,S))};
 do_handle_call({delete,Tab},S) ->
-  assert_deleted(Tab),
-  {ok,S#state{tables=[S#state.tables]--[Tab]}};
+  {ok,assert_deleted(Tab,S)};
 do_handle_call(What,State) ->
   {What,State}.
 
-assert_created(Tab) ->
-  [ets:new(Tab,[named_table,ordered_set]) || ets:info(Tab,size) =:= undefined].
+assert_created(Tab,S = #state{tables=Ts,props=Ps}) ->
+  [ets:new(list_to_atom(Tab),Ps) || not lists:member(Tab,Ts)],
+  S#state{tables=[Tab|S#state.tables]}.
 
-assert_deleted(Tab) ->
-  [ets:delete(Tab) || ets:info(Tab,size) =/= undefined].
+assert_deleted(Tab,S = #state{tables=Ts}) ->
+  [ets:delete(list_to_atom(Tab)) || lists:member(Tab,Ts)],
+  S#state{tables=[S#state.tables]--[Tab]}.
