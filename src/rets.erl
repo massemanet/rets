@@ -7,12 +7,19 @@
 
 -module(rets).
 -author('mats cronqvist').
--export([ start/0
-         ,do/2]).
+-export([ start/0,       % start the application
+          start_link/0   % supervisor callback
+         ,do/2]).        % inets mod_fun callback
 
+%% main application starter
 start() ->
+  application:start(rets).
+
+%% supervisor callback
+start_link() ->
   [inets:start() || not is_started(inets)],
-  inets:start(httpd,conf()).
+  inets:start(httpd,conf()),
+  rets_tables:start_link().
 
 conf() ->
   Root = filename:join("/tmp",?MODULE),

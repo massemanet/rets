@@ -35,7 +35,7 @@ tryt() {
 # it should not be necessary to change anything outside of this block
 export ITEM=rets
 export ITEM_STARTMOD=$ITEM
-export ITEM_USER=$ITEM
+export ITEM_USER=$USER
 export ITEM_LOGDIR=`tryt /var/log /tmp`/$ITEM
 export ITEM_LIBDIR=`eval echo ~$ITEM_USER`/git/$ITEM
 export ITEM_DEPS="$ITEM_LIBDIR/deps/*"
