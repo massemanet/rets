@@ -77,6 +77,8 @@ expand_recs(Tup) when is_tuple(Tup) ->
 expand_recs(Term) ->
   Term.
 
+%% boilerplate ends here
+
 do_handle_call({create,Tab},S) ->
   {ok,assert_created(Tab,assert_deleted(Tab,S))};
 do_handle_call({delete,Tab},S) ->
@@ -86,8 +88,8 @@ do_handle_call(What,State) ->
 
 assert_created(Tab,S = #state{tables=Ts,props=Ps}) ->
   [ets:new(list_to_atom(Tab),Ps) || not lists:member(Tab,Ts)],
-  S#state{tables=[Tab|S#state.tables]}.
+  S#state{tables=(S#state.tables--[Tab])++[Tab]}.
 
 assert_deleted(Tab,S = #state{tables=Ts}) ->
   [ets:delete(list_to_atom(Tab)) || lists:member(Tab,Ts)],
-  S#state{tables=[S#state.tables]--[Tab]}.
+  S#state{tables=S#state.tables--[Tab]}.
