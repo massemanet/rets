@@ -1,7 +1,7 @@
 # rets
 ### a REST interface around ETS
 
-rets provides a CRUD service, providing a simple key/value store.
+rets is a CRUD service, providing a simple key/value store.
 Clients can use REST-style HTTP to read, write and delete simple tables, and rows in the tables.
 
 Start like this;
