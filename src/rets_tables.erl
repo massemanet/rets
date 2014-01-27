@@ -77,25 +77,17 @@ expand_recs(Term) ->
   Term.
 
 do_handle_call({create,Tab},S) ->
-  ets:new(Tab,[named_table,ordered_set]),
+  assert_deleted(Tab),
+  assert_created(Tab),
   {ok,S#state{tables=[Tab|S#state.tables]}};
 do_handle_call({delete,Tab},S) ->
-  ets:delete(Tab),
+  assert_deleted(Tab),
   {ok,S#state{tables=[S#state.tables]--[Tab]}};
-do_handle_call({list,Tab},S) ->
-  L = rectify(ets:tab2list(Tab)),
-  {L,S};
-do_handle_call({insert,Tab,K,V},S) ->
-  ets:insert(Tab,{K,V}),
-  {ok,S};
-do_handle_call({get,Tab,Key},S) ->
-  A = rectify(ets:lookup(Tab,Key)),
-  {A,S};
-do_handle_call({delete,Tab,Key},S) ->
-  ets:delete(Tab,Key),
-  {ok,S};
 do_handle_call(What,State) ->
   {What,State}.
 
-rectify(Term) ->
-  lists:flatten(io_lib:fwrite("~w",[Term])).
+assert_created(Tab) ->
+  [ets:new(Tab,[named_table,ordered_set]) || ets:info(Tab,size) =:= undefined].
+
+assert_deleted(Tab) ->
+  [ets:delete(Tab) || ets:info(Tab,size) =/= undefined].

@@ -49,18 +49,38 @@ ensure(X) ->
 %% if we don't want to handle the request, we do Act(defer)
 %% if we crash, there will be a 404.
 do(Act,Req) ->
-  case is_tick(Req) of
-    false -> Act("<b>Zzzz...</b>");
-    true  -> Act(ticker())
+  case {Req(method), string:tokens(Req(request_uri),"/")} of
+    {"GET",[Tab]}        -> Act(flat(icall({list,Tab})));
+    {"GET",[Tab,Key]}    -> Act(flat(icall({get,Tab,Key})));
+    {"PUT",[Tab]}        -> Act(flat(gcall({create,Tab})));
+    {"PUT",[Tab,Key]}    -> Act(flat(icall({insert,Tab,Key,Req(entity_body)})));
+    {"POST",[Tab]}       -> Act(Tab++": "++Req(entity_body));
+    {"POST",[Tab,Key]}   -> Act(Tab++": "++Key++": "++Req(entity_body));
+    {"DELETE",[Tab]}     -> Act(flat(gcall({delete,Tab})));
+    {"DELETE",[Tab,Key]} -> Act(flat(icall({delete,Tab,Key})));
+    _                    -> Act(flat(Req(all)))
   end.
 
-is_tick(Req) ->
-  Req(request_uri) =:= "/tick" andalso Req(method) =:= "GET".
+icall({list,Tab}) ->
+  enforce_created(Tab),
+  ets:tab2list(Tab);
+icall({insert,Tab,K,V}) ->
+  enforce_created(Tab),
+  ets:insert(Tab,{K,V});
+icall({get,Tab,Key}) ->
+  enforce_created(Tab),
+  ets:lookup(Tab,Key);
+icall({delete,Tab,Key}) ->
+  enforce_created(Tab),
+  ets:delete(Tab,Key).
 
-ticker() ->
-  T = round(1000-element(3,now())/1000),
-  receive
-  after T ->
-      {{Y,Mo,D},{H,Mi,S}} = calendar:now_to_local_time(now()),
-      io_lib:fwrite("~w-~.2.0w-~.2.0w ~.2.0w:~.2.0w:~.2.0w",[Y,Mo,D,H,Mi,S])
-  end.
+enforce_created(Tab) ->
+  [exit(nonexisting) || ets:info(Tab,size) =/= undefined].
+
+gcall(What) ->
+  gen_server:call(rets_tables,What).
+
+flat(Term) when not is_list(Term)->
+  flat([Term]);
+flat(Term) when is_list(Term)->
+  lists:flatten([io_lib:fwrite("~p~n",[T])||T<-Term]).
