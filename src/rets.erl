@@ -51,25 +51,21 @@ ensure(X) ->
 %% if we crash, there will be a 404.
 do(Act,Req) ->
   case {Req(method), string:tokens(Req(request_uri),"/")} of
-    {"GET",   [Tab]}     -> Act(flat(icall({list,Tab})));
-    {"GET",   [Tab,Key]} -> Act(flat(icall({get,Tab,Key})));
+    {"GET",   [Tab]}     -> Act(flat(ets({list,Tab})));
+    {"GET",   [Tab,Key]} -> Act(flat(ets({get,Tab,Key})));
     {"PUT",   [Tab]}     -> Act(flat(gcall({create,Tab})));
-    {"PUT",   [Tab,Key]} -> Act(flat(icall({insert,Tab,Key,Req(entity_body)})));
+    {"PUT",   [Tab,Key]} -> Act(flat(ets({insert,Tab,Key,Req(entity_body)})));
     {"POST",  [Tab]}     -> Act(Tab++": "++Req(entity_body));
     {"POST",  [Tab,Key]} -> Act(Tab++": "++Key++": "++Req(entity_body));
     {"DELETE",[Tab]}     -> Act(flat(gcall({delete,Tab})));
-    {"DELETE",[Tab,Key]} -> Act(flat(icall({delete,Tab,Key})));
+    {"DELETE",[Tab,Key]} -> Act(flat(ets({delete,Tab,Key})));
     _                    -> Act(flat(Req(all)))
   end.
 
-icall({list,Tab}) ->
-  ets:tab2list(list_to_existing_atom(Tab));
-icall({insert,Tab,K,V}) ->
-  ets:insert(list_to_existing_atom(Tab),{K,V});
-icall({get,Tab,Key}) ->
-  ets:lookup(list_to_existing_atom(Tab),Key);
-icall({delete,Tab,Key}) ->
-  ets:delete(list_to_existing_atom(Tab),Key).
+ets({list,Tab})       -> ets:tab2list(list_to_existing_atom(Tab));
+ets({insert,Tab,K,V}) -> ets:insert(list_to_existing_atom(Tab),{K,V});
+ets({get,Tab,Key})    -> ets:lookup(list_to_existing_atom(Tab),Key);
+ets({delete,Tab,Key}) -> ets:delete(list_to_existing_atom(Tab),Key).
 
 gcall(What) ->
   gen_server:call(rets_tables,What).
