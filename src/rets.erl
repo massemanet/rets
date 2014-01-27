@@ -35,7 +35,8 @@ conf() ->
                 {"ico","image/x-icon"},
                 {"js","application/javascript"}]}].
 
-is_started(A) -> lists:member(A,[X||{X,_,_}<-application:which_applications()]).
+is_started(A) ->
+  lists:member(A,[X || {X,_,_} <- application:which_applications()]).
 
 ensure(X) ->
   filelib:ensure_dir(X++"/"),
@@ -50,12 +51,12 @@ ensure(X) ->
 %% if we crash, there will be a 404.
 do(Act,Req) ->
   case {Req(method), string:tokens(Req(request_uri),"/")} of
-    {"GET",[Tab]}        -> Act(flat(icall({list,Tab})));
-    {"GET",[Tab,Key]}    -> Act(flat(icall({get,Tab,Key})));
-    {"PUT",[Tab]}        -> Act(flat(gcall({create,Tab})));
-    {"PUT",[Tab,Key]}    -> Act(flat(icall({insert,Tab,Key,Req(entity_body)})));
-    {"POST",[Tab]}       -> Act(Tab++": "++Req(entity_body));
-    {"POST",[Tab,Key]}   -> Act(Tab++": "++Key++": "++Req(entity_body));
+    {"GET",   [Tab]}     -> Act(flat(icall({list,Tab})));
+    {"GET",   [Tab,Key]} -> Act(flat(icall({get,Tab,Key})));
+    {"PUT",   [Tab]}     -> Act(flat(gcall({create,Tab})));
+    {"PUT",   [Tab,Key]} -> Act(flat(icall({insert,Tab,Key,Req(entity_body)})));
+    {"POST",  [Tab]}     -> Act(Tab++": "++Req(entity_body));
+    {"POST",  [Tab,Key]} -> Act(Tab++": "++Key++": "++Req(entity_body));
     {"DELETE",[Tab]}     -> Act(flat(gcall({delete,Tab})));
     {"DELETE",[Tab,Key]} -> Act(flat(icall({delete,Tab,Key})));
     _                    -> Act(flat(Req(all)))
