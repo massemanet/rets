@@ -51,6 +51,7 @@ ensure(X) ->
 %% if we crash, there will be a 404.
 do(Act,Req) ->
   case {Req(method), string:tokens(Req(request_uri),"/")} of
+    {"GET",   []}        -> Act(flat(gcall({all,[]})));
     {"GET",   [Tab]}     -> Act(flat(ets({list,Tab})));
     {"GET",   [Tab,Key]} -> Act(flat(ets({get,Tab,Key})));
     {"PUT",   [Tab]}     -> Act(flat(gcall({create,Tab})));

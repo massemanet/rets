@@ -79,6 +79,8 @@ expand_recs(Term) ->
 
 %% boilerplate ends here
 
+do_handle_call({all,[]},S) ->
+  {S#state.tables,S};
 do_handle_call({create,Tab},S) ->
   {ok,assert_created(Tab,assert_deleted(Tab,S))};
 do_handle_call({delete,Tab},S) ->
