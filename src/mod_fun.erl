@@ -126,7 +126,8 @@ fourofour(ModRec) ->
 %% if we don't get headers first time, use default headers.
 %% if we're not usung chunked encoding, stash everything.
 %% if we are using chunked encoding, send every chunk we get.
-chunk(Chunk,S,ModRec) ->
+chunk(Chnk,S,ModRec) ->
+  Chunk = to_list(Chnk),
   case S#s.state of
     init ->
       {Headers,Body} = check_headers(Chunk),
@@ -158,6 +159,9 @@ check_headers(Chunk) ->
 is_headers([{_,_}|L]) -> is_headers(L);
 is_headers([]) -> true;
 is_headers(_) -> false.
+
+to_list(L) when is_list(L) -> L;
+to_list(B) when is_binary(B) -> binary_to_list(B).
 
 %%%% send stuff
 %% not chunking

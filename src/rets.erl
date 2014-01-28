@@ -50,28 +50,30 @@ ensure(X) ->
 %% if we don't want to handle the request, we do Act(defer)
 %% if we crash, there will be a 404.
 do(Act,Req) ->
-  case {Req(method), string:tokens(Req(request_uri),"/")} of
-    {"GET",   []}        -> Act(flat(gcall({all,[]})));
-    {"GET",   [Tab]}     -> Act(flat(ets({list,Tab})));
-    {"GET",   [Tab,Key]} -> Act(flat(ets({get,Tab,Key})));
-    {"PUT",   [Tab]}     -> Act(flat(gcall({create,Tab})));
-    {"PUT",   [Tab,Key]} -> Act(flat(ets({insert,Tab,Key,Req(entity_body)})));
-    {"POST",  [Tab]}     -> Act(Tab++": "++Req(entity_body));
-    {"POST",  [Tab,Key]} -> Act(Tab++": "++Key++": "++Req(entity_body));
-    {"DELETE",[Tab]}     -> Act(flat(gcall({delete,Tab})));
-    {"DELETE",[Tab,Key]} -> Act(flat(ets({delete,Tab,Key})));
-    _                    -> Act(flat(Req(all)))
+  case {Req(method),string:tokens(Req(request_uri),"/")} of
+    {"GET",   []       } -> Act(je([l2b(T)||T<-gcall({all,[]})]));
+    {"GET",   [Tab]    } -> Act(je({ets({list,Tab})}));
+    {"GET",   [Tab,Key]} -> Act(je({ets({get,Tab,Key})}));
+    {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
+    {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
+    {"DELETE",[Tab]    } -> Act(je(gcall({delete,Tab})));
+    {"DELETE",[Tab,Key]} -> Act(je(ets({delete,Tab,Key})));
+    _                    -> Act(je(Req(all)))
   end.
 
-ets({list,Tab})       -> ets:tab2list(list_to_existing_atom(Tab));
-ets({insert,Tab,K,V}) -> ets:insert(list_to_existing_atom(Tab),{K,V});
-ets({get,Tab,Key})    -> ets:lookup(list_to_existing_atom(Tab),Key);
-ets({delete,Tab,Key}) -> ets:delete(list_to_existing_atom(Tab),Key).
+ets({list,Tab})       -> ets:tab2list(l2ea(Tab));
+ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
+ets({get,Tab,Key})    -> ets:lookup(l2ea(Tab),l2b(Key));
+ets({delete,Tab,Key}) -> ets:delete(l2ea(Tab),l2b(Key)).
+
+l2b(L) ->
+  list_to_binary(L).
+
+l2ea(L) ->
+  list_to_existing_atom(L).
 
 gcall(What) ->
   gen_server:call(rets_tables,What).
 
-flat(Term) when not is_list(Term)->
-  flat([Term]);
-flat(Term) when is_list(Term)->
-  lists:flatten([io_lib:fwrite("~p~n",[T])||T<-Term]).
+je(Term) ->
+  jiffy:encode(Term).
