@@ -133,7 +133,7 @@ chunk(Chnk,S,M) ->
       {Headers,Body} = check_headers(Chunk),
       case S#s.chunked_send_p of
         true ->
-          send_headers(true,M,Headers),
+          send_header(M,200,[{"transfer-encoding","chunked"}|Headers]),
           send_chunk(M,Body),
           Len = S#s.length + length(Body),
           S#s{state=sent_headers,chunks=[],length=Len};
@@ -163,19 +163,7 @@ is_headers(_) -> false.
 to_list(L) when is_list(L) -> L;
 to_list(B) when is_binary(B) -> binary_to_list(B).
 
-%%%% send stuff
-%% not chunking
-send_headers(false,M,Headers) ->
-  send_header(M,200,[{"connection","close"} | Headers]);
-%% chunking
-send_headers(true,M,Headers) ->
-  send_header(M,200,[{"transfer-encoding","chunked"} | Headers]).
-
 %% wrapper around httpd_response
-send_header(M,Status,HTTPHeaders) ->
-  ExtraHeaders = read_header_cache(M),
-  httpd_response:send_header(M,Status,ExtraHeaders++HTTPHeaders).
-
 send_chunk(M,Chunk) ->
   httpd_response:send_chunk(M,Chunk,false).
 
@@ -184,9 +172,13 @@ send_final_chunk(M) ->
 
 send_unchunked(Status,M,Headers,Body) ->
   Len = integer_to_list(lists:flatlength(Body)),
-  send_headers(false,M,[{"content-length",Len} | Headers]),
+  send_header(M,200,[{"content-length",Len},{"connection","close"}|Headers]),
   httpd_response:send_body(M,Status,Body),
   Len.
+
+send_header(M,Status,HTTPHeaders) ->
+  ExtraHeaders = read_header_cache(M),
+  httpd_response:send_header(M,Status,ExtraHeaders++HTTPHeaders).
 
 read_header_cache(M) ->
   try httpd_response:cache_headers(M)                % -R15
