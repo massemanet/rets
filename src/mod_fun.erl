@@ -79,14 +79,14 @@ chunked_send_p(#mod{config_db=Db,http_version=HTTPV}) ->
 %% we spawn into the handler fun, monitors it, and waits for data chunks.
 handle(M) ->
   Self = self(),
-  {M,F} = mod_get(M,handler_function),
+  {Mod,Fun} = mod_get(M,handler_function),
   S = #s{chunked_send_p=chunked_send_p(M),
          timeout=mod_get(M,handler_timeout)},
   Act = fun(defer) -> exit(defer);(L) -> Self ! {self(),L} end,
-  Mod = lists:zip(record_info(fields,mod),tl(tuple_to_list(M))),
-  Req = fun(all) -> proplists:unfold(Mod);
-           (Key) -> proplists:get_value(Key,Mod) end,
-  loop(spawn_monitor(fun() -> M:F(Act,Req) end),S,M).
+  Mpl = lists:zip(record_info(fields,mod),tl(tuple_to_list(M))),
+  Req = fun(all) -> proplists:unfold(Mpl);
+           (Key) -> proplists:get_value(Key,Mpl) end,
+  loop(spawn_monitor(fun() -> Mod:Fun(Act,Req) end),S,M).
 
 mod_get(M,Key) ->
   httpd_util:lookup(M#mod.config_db,Key,default(Key)).
