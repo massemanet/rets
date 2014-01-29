@@ -39,17 +39,17 @@ store({handler_function, {M,F}} = Conf, _) when is_atom(M),is_atom(F)->
 store({handler_integer, TO} = Conf, _) when is_integer(TO)->
   {ok, Conf}.
 
-do(ModRec) ->
-  case defer_response(ModRec) of
-    false-> {proceed, safe_handle(ModRec)};
-    true -> {proceed, ModRec#mod.data}
+do(M) ->
+  case defer_response(M) of
+    false-> {proceed, safe_handle(M)};
+    true -> {proceed, M#mod.data}
   end.
 
 %% we guarantee that handle/1 succeeds (in which case we send a 200) or we
 %% generate a 404.
-safe_handle(ModRec) ->
-  try handle(ModRec)
-  catch _:_ -> fourofour(ModRec)
+safe_handle(M) ->
+  try handle(M)
+  catch _:_ -> fourofour(M)
   end.
 
 %% true if some other mod_* has already handled the request
@@ -77,64 +77,64 @@ chunked_send_p(#mod{config_db=Db,http_version=HTTPV}) ->
   (HTTPV =/= "HTTP/1.1") orelse httpd_response:is_disable_chunked_send(Db).
 
 %% we spawn into the handler fun, monitors it, and waits for data chunks.
-handle(ModRec) ->
+handle(M) ->
   Self = self(),
-  {M,F} = mod_get(ModRec,handler_function),
-  S = #s{chunked_send_p=chunked_send_p(ModRec),
-         timeout=mod_get(ModRec,handler_timeout)},
+  {M,F} = mod_get(M,handler_function),
+  S = #s{chunked_send_p=chunked_send_p(M),
+         timeout=mod_get(M,handler_timeout)},
   Act = fun(defer) -> exit(defer);(L) -> Self ! {self(),L} end,
-  Mod = lists:zip(record_info(fields,mod),tl(tuple_to_list(ModRec))),
+  Mod = lists:zip(record_info(fields,mod),tl(tuple_to_list(M))),
   Req = fun(all) -> proplists:unfold(Mod);
            (Key) -> proplists:get_value(Key,Mod) end,
-  loop(spawn_monitor(fun() -> M:F(Act,Req) end),S,ModRec).
+  loop(spawn_monitor(fun() -> M:F(Act,Req) end),S,M).
 
-mod_get(ModRec,Key) ->
-  httpd_util:lookup(ModRec#mod.config_db,Key,default(Key)).
+mod_get(M,Key) ->
+  httpd_util:lookup(M#mod.config_db,Key,default(Key)).
 
-loop({Pid,Ref},S,ModRec) ->
+loop({Pid,Ref},S,M) ->
   Timeout = S#s.timeout,
   receive
-    {Pid,Chunk} -> loop({Pid,Ref},chunk(Chunk,S,ModRec),ModRec);
+    {Pid,Chunk} -> loop({Pid,Ref},chunk(Chunk,S,M),M);
     {'DOWN',Ref,_,Pid,Reason} ->
       case {S#s.state,Reason} of
-        {sent_headers,defer} -> twohundred(ModRec,S);
-        {_,defer}            -> ModRec#mod.data;
-        {init,normal}        -> fourofour(ModRec);
-        {_,normal}           -> twohundred(ModRec,S);
-        {sent_headers,_}     -> twohundred(ModRec,S);
-        {_,_}                -> fourofour(ModRec)
+        {sent_headers,defer} -> twohundred(M,S);
+        {_,defer}            -> M#mod.data;
+        {init,normal}        -> fourofour(M);
+        {_,normal}           -> twohundred(M,S);
+        {sent_headers,_}     -> twohundred(M,S);
+        {_,_}                -> fourofour(M)
       end
   after
     Timeout ->
       exit(Pid,kill),
-      loop({Pid,Ref},S,ModRec)
+      loop({Pid,Ref},S,M)
   end.
 
 %% all went well. response is 200.
-twohundred(ModRec,S) ->
+twohundred(M,S) ->
   case S#s.state of
-    has_headers -> send_unchunked(200,ModRec,S#s.headers,S#s.chunks);
-    sent_headers-> send_final_chunk(ModRec)
+    has_headers -> send_unchunked(200,M,S#s.headers,S#s.chunks);
+    sent_headers-> send_final_chunk(M)
   end,
-  [{response, {already_sent, 200, S#s.length}} | ModRec#mod.data].
+  [{response, {already_sent, 200, S#s.length}} | M#mod.data].
 
-fourofour(ModRec) ->
-  Len = send_unchunked(404,ModRec,[{"connection","close"}],"nothing here."),
-  [{response,{already_sent,404,Len}} | ModRec#mod.data].
+fourofour(M) ->
+  Len = send_unchunked(404,M,[{"connection","close"}],"nothing here."),
+  [{response,{already_sent,404,Len}} | M#mod.data].
 
 %% got a chunk. it's either headers or a body part.
 %% if we don't get headers first time, use default headers.
 %% if we're not usung chunked encoding, stash everything.
 %% if we are using chunked encoding, send every chunk we get.
-chunk(Chnk,S,ModRec) ->
+chunk(Chnk,S,M) ->
   Chunk = to_list(Chnk),
   case S#s.state of
     init ->
       {Headers,Body} = check_headers(Chunk),
       case S#s.chunked_send_p of
         true ->
-          send_headers(true,ModRec,Headers),
-          send_chunk(ModRec,Body),
+          send_headers(true,M,Headers),
+          send_chunk(M,Body),
           Len = S#s.length + length(Body),
           S#s{state=sent_headers,chunks=[],length=Len};
         false->
@@ -142,7 +142,7 @@ chunk(Chnk,S,ModRec) ->
       end;
     sent_headers ->
       Len = S#s.length + length(Chunk),
-      send_chunk(ModRec,Chunk),
+      send_chunk(M,Chunk),
       S#s{length=Len};
     has_headers ->
       S#s{chunks=S#s.chunks++Chunk};
@@ -165,32 +165,32 @@ to_list(B) when is_binary(B) -> binary_to_list(B).
 
 %%%% send stuff
 %% not chunking
-send_headers(false,ModRec,Headers) ->
-  send_headers(ModRec,[{"connection","close"} | Headers]);
+send_headers(false,M,Headers) ->
+  send_header(M,200,[{"connection","close"} | Headers]);
 %% chunking
-send_headers(true,ModRec,Headers) ->
-  send_headers(ModRec,[{"transfer-encoding","chunked"} | Headers]).
+send_headers(true,M,Headers) ->
+  send_header(M,200,[{"transfer-encoding","chunked"} | Headers]).
 
 %% wrapper around httpd_response
-send_headers(ModRec,HTTPHeaders) ->
-  ExtraHeaders = read_header_cache(ModRec),
-  httpd_response:send_header(ModRec,200,ExtraHeaders++HTTPHeaders).
+send_header(M,Status,HTTPHeaders) ->
+  ExtraHeaders = read_header_cache(M),
+  httpd_response:send_header(M,Status,ExtraHeaders++HTTPHeaders).
 
-send_chunk(ModRec,Chunk) ->
-  httpd_response:send_chunk(ModRec,Chunk,false).
+send_chunk(M,Chunk) ->
+  httpd_response:send_chunk(M,Chunk,false).
 
-send_final_chunk(ModRec) ->
-  httpd_response:send_final_chunk(ModRec,false).
+send_final_chunk(M) ->
+  httpd_response:send_final_chunk(M,false).
 
-send_unchunked(Status,ModRec,Headers,Body) ->
+send_unchunked(Status,M,Headers,Body) ->
   Len = integer_to_list(lists:flatlength(Body)),
-  send_headers(false,ModRec,[{"content-length",Len} | Headers]),
-  httpd_response:send_body(ModRec,Status,Body),
+  send_headers(false,M,[{"content-length",Len} | Headers]),
+  httpd_response:send_body(M,Status,Body),
   Len.
 
-read_header_cache(ModRec) ->
-  try httpd_response:cache_headers(ModRec)                % -R15
+read_header_cache(M) ->
+  try httpd_response:cache_headers(M)                % -R15
   catch
     _:undef ->
-      httpd_response:cache_headers(ModRec,script_nocache) % R16-
+      httpd_response:cache_headers(M,script_nocache) % R16-
   end.
