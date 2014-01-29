@@ -119,8 +119,7 @@ twohundred(M,S) ->
   [{response, {already_sent, 200, S#s.length}} | M#mod.data].
 
 fourofour(M) ->
-  Len = send_unchunked(404,M,[{"connection","close"}],"nothing here."),
-  [{response,{already_sent,404,Len}} | M#mod.data].
+  [{status,{404, M#mod.request_uri, "BadRequest"}} | M#mod.data].
 
 %% got a chunk. it's either headers or a body part.
 %% if we don't get headers first time, use default headers.
