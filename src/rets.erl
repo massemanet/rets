@@ -54,6 +54,7 @@ do(Act,Req) ->
     {"GET",   []       } -> Act(je([l2b(T)||T<-gcall({all,[]})]));
     {"GET",   [Tab]    } -> Act(je({ets({list,Tab})}));
     {"GET",   [Tab,Key]} -> Act(je({ets({get,Tab,Key})}));
+    {"GET",   [_,_,_]}   -> exit({redirect,"http://klarna.com"});
     {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
     {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
     {"DELETE",[Tab]    } -> Act(je(gcall({delete,Tab})));

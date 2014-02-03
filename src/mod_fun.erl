@@ -49,7 +49,7 @@ do(M) ->
 %% generate a 404.
 safe_handle(M) ->
   try handle(M)
-  catch _:_ -> fourofour(M)
+  catch _:_ -> fourohfour(M,[])
   end.
 
 %% true if some other mod_* has already handled the request
@@ -71,10 +71,6 @@ defer_response(#mod{data=Data}) ->
            length=0,
            chunked_send_p,
            timeout}).
-
-%% should we do chunked sending
-chunked_send_p(#mod{config_db=Db,http_version=HTTPV}) ->
-  (HTTPV =/= "HTTP/1.1") orelse httpd_response:is_disable_chunked_send(Db).
 
 %% we spawn into the handler fun, monitors it, and waits for data chunks.
 handle(M) ->
@@ -99,10 +95,11 @@ loop({Pid,Ref},S,M) ->
       case {S#s.state,Reason} of
         {sent_headers,defer} -> twohundred(M,S);
         {_,defer}            -> M#mod.data;
-        {init,normal}        -> fourofour(M);
+        {_,{redirect,URL}}   -> threeohone(M,S,URL);
+        {init,normal}        -> fourohfour(M,S);
         {_,normal}           -> twohundred(M,S);
         {sent_headers,_}     -> twohundred(M,S);
-        {_,_}                -> fourofour(M)
+        {_,_}                -> fourohfour(M,S)
       end
   after
     Timeout ->
@@ -118,8 +115,18 @@ twohundred(M,S) ->
   end,
   [{response, {already_sent, 200, S#s.length}} | M#mod.data].
 
-fourofour(M) ->
-  [{status,{404, M#mod.request_uri, "BadRequest"}} | M#mod.data].
+fourohfour(M,S) ->
+  send_status(M,S,404,"This is a 404",[]).
+
+threeohone(M,S,URL) ->
+  send_status(M,S,301,"Redirect to "++URL,[{"Location",URL}]).
+
+send_status(M,S,Status,Response,Headers) ->
+  case is_record(S,s) andalso S#s.state == sent_headers of
+    false-> send_unchunked(Status,M,Headers,Response);
+    true -> send_final_chunk(M)
+  end,
+  [{response, {already_sent, Status, length(Response)}} | M#mod.data].
 
 %% got a chunk. it's either headers or a body part.
 %% if we don't get headers first time, use default headers.
@@ -163,6 +170,13 @@ to_list(L) when is_list(L) -> L;
 to_list(B) when is_binary(B) -> binary_to_list(B).
 
 %% wrapper around httpd_response
+
+%% can we do chunked sending?
+chunked_send_p(#mod{config_db=Db,http_version=HTTPV}) ->
+  chunked_send_p(HTTPV,httpd_response:is_disable_chunked_send(Db)).
+chunked_send_p(HTTPV,Disabled) ->
+  (HTTPV =/= "HTTP/0.9") andalso (HTTPV =/= "HTTP/1.0") andalso (not Disabled).
+
 send_chunk(M,Chunk) ->
   httpd_response:send_chunk(M,Chunk,false).
 
@@ -170,10 +184,10 @@ send_final_chunk(M) ->
   httpd_response:send_final_chunk(M,false).
 
 send_unchunked(Status,M,Headers,Body) ->
-  Len = integer_to_list(lists:flatlength(Body)),
-  send_header(M,200,[{"content-length",Len},{"connection","close"}|Headers]),
+  L = integer_to_list(lists:flatlength(Body)),
+  send_header(M,Status,[{"content-length",L},{"connection","close"}|Headers]),
   httpd_response:send_body(M,Status,Body),
-  Len.
+  L.
 
 send_header(M,Status,HTTPHeaders) ->
   ExtraHeaders = read_header_cache(M),
