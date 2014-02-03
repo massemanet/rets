@@ -78,7 +78,10 @@ handle(M) ->
   {Mod,Fun} = mod_get(M,handler_function),
   S = #s{chunked_send_p=chunked_send_p(M),
          timeout=mod_get(M,handler_timeout)},
-  Act = fun(defer) -> exit(defer);(L) -> Self ! {self(),L} end,
+  Act = fun(defer)          -> exit(defer);
+           ({redirect,URL}) -> exit({redirect,URL});
+           (L)              -> Self ! {self(),L}
+        end,
   Mpl = lists:zip(record_info(fields,mod),tl(tuple_to_list(M))),
   Req = fun(all) -> proplists:unfold(Mpl);
            (Key) -> proplists:get_value(Key,Mpl) end,
