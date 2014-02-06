@@ -2,7 +2,7 @@
 %%% Created : 27 Jun 2012 by mats cronqvist <masse@klarna.com>
 
 %% @doc
-%% a pretty much minimal example of how to usu mod_fun
+%% a rest wrapper around ets
 %% @end
 
 -module(rets).
@@ -10,6 +10,8 @@
 -export([ start/0,       % start the application
           start_link/0   % supervisor callback
          ,do/2]).        % inets mod_fun callback
+
+-include_lib("eunit/include/eunit.hrl").
 
 %% main application starter
 start() ->
@@ -78,3 +80,34 @@ gcall(What) ->
 
 je(Term) ->
   jiffy:encode(Term).
+
+%%%%%%%%%%
+%% eunit
+t00_test() ->
+  application:stop(rets),
+  application:start(rets),
+  rets_client:put(localhost,tibbe),
+  rets_client:post(localhost,tibbe,[{aaa,"AAA"},{bbb,bBbB},{ccc,123.1}]),
+  ?assertEqual(rets_client:get(localhost,tibbe,aaa),
+               {200,"AAA"}),
+  ?assertEqual(rets_client:get(localhost,tibbe,bbb),
+               {200,<<"bBbB">>}),
+  ?assertEqual(rets_client:get(localhost,tibbe,ccc),
+               {200,123.1}).
+
+t01_test() ->
+  application:stop(rets),
+  application:start(rets),
+  rets_client:put(localhost,tibbe),
+  rets_client:put(localhost,tibbe,aaa,"AAA"),
+  rets_client:put(localhost,tibbe,bbb,bBbB),
+  rets_client:put(localhost,tibbe,ccc,123.1),
+  rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}]),
+  ?assertEqual(rets_client:get(localhost,tibbe,aaa),
+               {200,"AAA"}),
+  ?assertEqual(rets_client:get(localhost,tibbe,bbb),
+               {200,<<"bBbB">>}),
+  ?assertEqual(rets_client:get(localhost,tibbe,ccc),
+               {200,123.1}),
+  ?assertEqual(rets_client:get(localhost,tibbe,ddd),
+               {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
