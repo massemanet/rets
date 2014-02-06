@@ -6,7 +6,7 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/2,get/3,delete/2,delete/3,put/2,put/4]).
+-export([get/2,get/3,delete/2,delete/3,put/2,put/4,post/3]).
 
 get(Host,Tab) ->
   get(Host,Tab,"").
@@ -35,6 +35,11 @@ put(Host,Tab) ->
 put(Host,Tab,Key,PL) ->
   {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
     httpc:request(put,{url(Host,Tab,Key),[],[],enc(prep(PL))},[],[]),
+  {Status,Reply}.
+
+post(Host,Tab,PL) ->
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(post,{url(Host,Tab,""),[],[],enc(prep(PL))},[],[]),
   {Status,Reply}.
 
 url(Host,Tab,Key) ->

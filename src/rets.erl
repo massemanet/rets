@@ -56,9 +56,9 @@ do(Act,Req) ->
     {"GET",   []       } -> Act(je([l2b(T)||T<-gcall({all,[]})]));
     {"GET",   [Tab]    } -> Act(je({ets({list,Tab})}));
     {"GET",   [Tab,Key]} -> Act(ets({get,Tab,Key}));
-    {"GET",   [_,_,_]}   -> Act({redirect,"http://klarna.com"});
     {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
     {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
+    {"POST",  [Tab]    } -> Act(je(ets({insert,Tab,Req(entity_body)})));
     {"DELETE",[Tab]    } -> Act(je(gcall({delete,Tab})));
     {"DELETE",[Tab,Key]} -> Act(je(ets({delete,Tab,Key})));
     _                    -> Act(je(Req(all)))
@@ -66,8 +66,16 @@ do(Act,Req) ->
 
 ets({list,Tab})       -> ets:tab2list(l2ea(Tab));
 ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
+ets({insert,Tab,KVs}) -> ets:insert(l2ea(Tab),unpack(KVs));
 ets({get,Tab,Key})    -> element(2,hd(ets:lookup(l2ea(Tab),l2b(Key))));
 ets({delete,Tab,Key}) -> ets:delete(l2ea(Tab),l2b(Key)).
+
+unpack(KVs) ->
+  {PL} = jd(KVs),
+  [{K,je(V)} || {K,V} <- PL].
+
+jd(Term) ->
+  jiffy:decode(Term).
 
 l2b(L) ->
   list_to_binary(L).
