@@ -45,15 +45,10 @@ post(Host,Tab,PL) ->
 url(Host,Tab,Key) ->
   "http://"++to_list(Host)++":8765/"++to_list(Tab)++"/"++to_list(Key).
 
-prep(P) ->
-  case is_proplist(P) of
-    true -> {P};
-    false-> P
-  end.
-
-is_proplist([{_,_}|T]) -> is_proplist(T);
-is_proplist([])        -> true;
-is_proplist(_)         -> false.
+prep(PL = [{_,_}|_]) -> {[{prep(K),prep(V)}||{K,V}<-PL]};
+prep(L) when is_list(L) -> [prep(E)||E<-L];
+prep(T) when is_tuple(T) -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]);
+prep(X) -> X.
 
 to_list(X) when is_binary(X) -> binary_to_list(X);
 to_list(X) when is_list(X)   -> X;

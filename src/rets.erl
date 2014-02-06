@@ -95,13 +95,16 @@ t00_test() ->
   application:stop(rets),
   application:start(rets),
   rets_client:put(localhost,tibbe),
-  rets_client:post(localhost,tibbe,[{aaa,"AAA"},{bbb,bBbB},{ccc,123.1}]),
+  rets_client:post(localhost,tibbe,[{aaa,"AAA"},{bbb,bBbB},{ccc,123.1},
+                                    {ddd,[{a,"A"},{b,b},{c,123.3}]}]),
   ?assertEqual(rets_client:get(localhost,tibbe,aaa),
                {200,"AAA"}),
   ?assertEqual(rets_client:get(localhost,tibbe,bbb),
                {200,<<"bBbB">>}),
   ?assertEqual(rets_client:get(localhost,tibbe,ccc),
-               {200,123.1}).
+               {200,123.1}),
+  ?assertEqual(rets_client:get(localhost,tibbe,ddd),
+               {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
 
 t01_test() ->
   application:stop(rets),
