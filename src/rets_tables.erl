@@ -82,11 +82,9 @@ expand_recs(Term) ->
 do_handle_call({all,[]},S) ->
   {S#state.tables,S};
 do_handle_call({create,Tab},S) ->
-  {ok,assert_created(Tab,assert_deleted(Tab,S))};
+  {true,assert_created(Tab,assert_deleted(Tab,S))};
 do_handle_call({delete,Tab},S) ->
-  {ok,assert_deleted(Tab,S)};
-do_handle_call(What,State) ->
-  {What,State}.
+  {true,assert_deleted(Tab,S)}.
 
 assert_created(Tab,S = #state{tables=Ts,props=Ps}) ->
   case lists:member(Tab,Ts) of
