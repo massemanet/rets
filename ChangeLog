@@ -1,0 +1,283 @@
+commit 1341aaab7cd442fe8ec9068a001e35174148a231
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Feb 10 15:01:36 2014 +0100
+
+    v0.3.0
+
+src/rets.app.src
+
+commit b84cc2e0a6f098d4f17e5bf922ce7df3ac6e0385
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Feb 6 15:15:24 2014 +0100
+
+    improve handling of nested proplists
+
+src/rets.erl
+src/rets_client.erl
+
+commit ca26538ea05bd1ae0942930f6673b09324440d26
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Feb 6 13:15:41 2014 +0100
+
+    cosmetic
+
+src/rets_tables.erl
+
+commit f8c98dac8c87f90af39e3c14b36e0bd81760d064
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Feb 6 13:15:15 2014 +0100
+
+    add POST method - bulk fill a table, similar to ets:file2tab
+
+src/rets.erl
+src/rets_client.erl
+
+commit ad0574435fc3122ce1b27c9980ae5711a27b5029
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Feb 6 13:14:11 2014 +0100
+
+    add some eunit tests
+
+Makefile
+src/rets.erl
+
+commit 685d1470aad131e457075756453ad7d358565539
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Feb 6 09:35:07 2014 +0100
+
+    improve erlang->json->erlang mappings
+
+src/rets_client.erl
+
+commit 56bcbbafd99381cf7a5b2873c1995193b6aa28a9
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Feb 5 17:52:49 2014 +0100
+
+    make erlang->json->erlang transcoding more intuitive
+
+src/rets.erl
+src/rets_client.erl
+
+commit 7e577d0e4699bb37c8cd80273b7ec9a870e9492a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Feb 3 16:13:12 2014 +0100
+
+    make proper redirects
+
+src/mod_fun.erl
+src/rets.erl
+
+commit dc85e90d737e96a66b4a7a8398da99ad458102d5
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Feb 3 12:38:51 2014 +0100
+
+    demo 301
+
+src/mod_fun.erl
+src/rets.erl
+
+commit 178d989f60bf440cb0daadd30fbf3617babe79f7
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 20:12:12 2014 +0100
+
+    add a client
+
+src/rets_client.erl
+
+commit 190efd4822f446655192b90083d8bd4eeec0fb44
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 19:37:49 2014 +0100
+
+    fix 404
+
+src/mod_fun.erl
+
+commit ff92e91bfb2fdbcfe56af3b6b34a6ff218713e97
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 19:37:34 2014 +0100
+
+    refactor send_header mess
+
+src/mod_fun.erl
+
+commit 0afcd0d364388975dc7f3ec33015e39db45de09b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 19:36:17 2014 +0100
+
+    fix buggy cosmetic
+
+src/mod_fun.erl
+
+commit 7be879afe9d145bc980af413464af1603335391c
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 19:02:43 2014 +0100
+
+    cosmetic
+
+src/mod_fun.erl
+
+commit 666a62169dd887853d3dae841c2e3d262d2dabb8
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jan 29 18:58:53 2014 +0100
+
+    make boot script more verbose
+
+bin/rets.sh
+
+commit 7c79dee24cc01b881911702ab24eb99bd333c91f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jan 28 12:47:10 2014 +0100
+
+    add jiffy and eper as deps
+
+.gitignore
+Makefile
+rebar.config
+
+commit 3329d463828c6ebcc3e48d5ef8c826a6c4480141
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jan 28 12:23:09 2014 +0100
+
+    use json (jiffy)
+
+src/mod_fun.erl
+src/rets.erl
+
+commit b56a21291c2426e39f9e2bf092d1b750be9440d5
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jan 28 10:18:16 2014 +0100
+
+    support GET "/" ; return list of tables
+
+src/rets.erl
+src/rets_tables.erl
+
+commit c6b9093b5d51001e206b2eab76ba0ef622618b57
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 21:45:34 2014 +0100
+
+    cosmetic
+
+src/rets.erl
+
+commit 02328d652fcd24ff75938fd5d2625a649752a57b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 21:43:34 2014 +0100
+
+    cosmetic
+
+src/rets.erl
+
+commit 72974e8edfd362228d44436411dc3ddc3b31cd48
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 21:39:40 2014 +0100
+
+    rewrite for clarity
+
+src/rets_tables.erl
+
+commit 983291e6701079a30874b485ddfd0cd2db516815
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 21:32:58 2014 +0100
+
+    fix bug in state handling
+
+README.md
+src/rets_tables.erl
+
+commit 0c02129093e0704c3ee52c9a9dd75e9f9624bde6
+Author: mats cronqvist <masse@cronqvi.st>
+Date:   Mon Jan 27 21:14:10 2014 +0100
+
+    Update README.md
+
+README.md
+
+commit 69b01b8c2f226d8d84b1e6ceb21719d0d0f7cde0
+Author: mats cronqvist <masse@cronqvi.st>
+Date:   Mon Jan 27 21:04:24 2014 +0100
+
+    Update README.md
+
+README.md
+
+commit 3505d16bc33c4cf67d3ac70ec938d0fc9ecc1dd7
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 20:54:34 2014 +0100
+
+    markdownified
+
+README.md
+
+commit 08a5203eeb357cb939eae119489be7033edd6d7c
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 20:48:26 2014 +0100
+
+    make it work, and document
+
+README.md
+src/rets.erl
+src/rets_tables.erl
+
+commit 7f1f5f726e6674881db10b0a19d37e5f51275f04
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 16:43:30 2014 +0100
+
+    make implementation almost work
+
+src/rets.erl
+src/rets_tables.erl
+
+commit 4698990301d3dce1232998f35ba9a7db529d13a3
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 12:57:58 2014 +0100
+
+    add some non-boilerplate code
+
+src/rets_tables.erl
+
+commit 7b498401edc01aca3b2210c7c20652edfc8ea01e
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 12:38:42 2014 +0100
+
+    make bootscript work
+
+bin/rets.sh
+src/rets.erl
+src/rets_sup.erl
+
+commit 6482f5617c9180f6ac1f8f9a38d4f2b49804d127
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jan 27 12:16:22 2014 +0100
+
+    fortify boilerplate
+
+bin/rets.sh
+src/mod_fun.erl
+src/rets.app.src
+src/rets.erl
+src/rets_sup.erl
+src/rets_tables.erl
+
+commit 9d16c9c6242d61b634cd9aede3248265291faec2
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jan 24 15:42:23 2014 +0100
+
+    rebar boilerplate
+
+.gitignore
+Makefile
+rebar
+src/rets.app.src
+src/rets_app.erl
+src/rets_sup.erl
+
+commit c6a92d96083922d296faa676a924e2fb68eca7b4
+Author: mats cronqvist <masse@cronqvi.st>
+Date:   Fri Jan 24 06:33:59 2014 -0800
+
+    Initial commit
+
+.gitignore
+LICENSE
+README.md
