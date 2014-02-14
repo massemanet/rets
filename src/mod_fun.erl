@@ -14,6 +14,9 @@
 
 -define(VMODULE,"FUN").    % what the hell does this do? snmp??
 
+-ignore_xref([{httpd_response,cache_headers,1},
+              {httpd_response,cache_headers,2}]).
+
 %% the configuration parameters
 default(handler_timeout) -> 5000;
 default(handler_function) -> {"",""}.
@@ -196,8 +199,7 @@ send_header(M,Status,HTTPHeaders) ->
   ExtraHeaders = read_header_cache(M),
   httpd_response:send_header(M,Status,ExtraHeaders++HTTPHeaders).
 
--ifdef(HTTPD_R16).
-read_header_cache(M) -> httpd_response:cache_headers(M,script_nocache). % R16-
--else.
-read_header_cache(M) -> httpd_response:cache_headers(M).                % -R15
--endif.
+read_header_cache(M) ->
+  try httpd_response:cache_headers(M,script_nocache)   % R16-
+  catch _:undef -> httpd_response:cache_headers(M)     % -R15
+  end.
