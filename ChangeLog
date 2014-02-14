@@ -1,9 +1,35 @@
-commit f06835293be939b17947af0fd0f3b267c7fac041
+commit c7b6d9971c40fca4334da0541d233c2f18162019
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 15:34:42 2014 +0100
+
+    v0.4.1
+
+src/rets.app.src
+
+commit 80d0d7457cffed76918cb4ddae24b4321367abc4
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 15:34:20 2014 +0100
+
+    remove compile time OTP version check
+
+rebar.config.script
+src/mod_fun.erl
+
+commit 055fa30e73e4d9f054caed066a7de5c33871dd1b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:21:43 2014 +0100
+
+    cosmetic
+
+bin/rets.sh
+
+commit ad10d6a27f459eb97663470b380fdd79507321f4
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Feb 14 12:07:13 2014 +0100
 
     v0.4.0
 
+ChangeLog
 src/rets.app.src
 
 commit 4c443676bc6573dbb392318de76be42eedfb2324
