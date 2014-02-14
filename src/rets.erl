@@ -100,11 +100,11 @@ t00_test() ->
   ?assertEqual(rets_client:get(localhost,tibbe,aaa),
                {200,"AAA"}),
   ?assertEqual(rets_client:get(localhost,tibbe,bbb),
-               {200,<<"bBbB">>}),
+               {200,bBbB}),
   ?assertEqual(rets_client:get(localhost,tibbe,ccc),
                {200,123.1}),
   ?assertEqual(rets_client:get(localhost,tibbe,ddd),
-               {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
+               {200,[{a,"A"},{b,b},{c,123.3}]}).
 
 t01_test() ->
   application:stop(rets),
@@ -117,8 +117,19 @@ t01_test() ->
   ?assertEqual(rets_client:get(localhost,tibbe,aaa),
                {200,"AAA"}),
   ?assertEqual(rets_client:get(localhost,tibbe,bbb),
-               {200,<<"bBbB">>}),
+               {200,bBbB}),
   ?assertEqual(rets_client:get(localhost,tibbe,ccc),
                {200,123.1}),
   ?assertEqual(rets_client:get(localhost,tibbe,ddd),
+               {200,[{a,"A"},{b,b},{c,123.3}]}).
+
+t02_test() ->
+  application:stop(rets),
+  application:start(rets),
+  rets_client:put(localhost,tibbe),
+  rets_client:put(localhost,tibbe,bbb,bBbB),
+  rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}]),
+  ?assertEqual(rets_client:get(localhost,tibbe,bbb,[no_atoms]),
+               {200,<<"bBbB">>}),
+  ?assertEqual(rets_client:get(localhost,tibbe,ddd,[no_atoms]),
                {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
