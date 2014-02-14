@@ -1,9 +1,26 @@
-commit fea72d3f50a33de23addf2246e69cb69eaf8ec0e
+commit fc33ab26fc3cdfaae00542d35b693deb8d18a331
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:05:23 2014 +0100
+
+    v0.3.3
+
+src/rets.app.src
+
+commit 9a68ce46e87aaf880e2586624a643a64eaaa6ff2
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:05:03 2014 +0100
+
+    support major and minor releases in Makefile
+
+Makefile
+
+commit f55c30fd91f901616fe4f26b3ea975ed26506a5c
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Feb 14 12:02:02 2014 +0100
 
     v0.3.2
 
+ChangeLog
 src/rets.app.src
 
 commit 45e00b078240c730b184f7ab0346b10d2110a98e
