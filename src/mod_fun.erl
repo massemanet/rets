@@ -196,9 +196,8 @@ send_header(M,Status,HTTPHeaders) ->
   ExtraHeaders = read_header_cache(M),
   httpd_response:send_header(M,Status,ExtraHeaders++HTTPHeaders).
 
-read_header_cache(M) ->
-  try httpd_response:cache_headers(M)                % -R15
-  catch
-    _:undef ->
-      httpd_response:cache_headers(M,script_nocache) % R16-
-  end.
+-ifdef(HTTPD_R16).
+read_header_cache(M) -> httpd_response:cache_headers(M,script_nocache). % R16-
+-else.
+read_header_cache(M) -> httpd_response:cache_headers(M).                % -R15
+-endif.
