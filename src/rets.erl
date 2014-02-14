@@ -54,7 +54,7 @@ ensure(X) ->
 do(Act,Req) ->
   case {Req(method),string:tokens(Req(request_uri),"/")} of
     {"GET",   []       } -> Act(je([l2b(T)||T<-gcall({all,[]})]));
-    {"GET",   [Tab]    } -> Act(je({ets({list,Tab})}));
+    {"GET",   [Tab]    } -> Act(je(ets({keys,Tab})));
     {"GET",   [Tab,Key]} -> Act(ets({get,Tab,Key}));
     {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
     {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
@@ -64,7 +64,7 @@ do(Act,Req) ->
     _                    -> Act(je(Req(all)))
   end.
 
-ets({list,Tab})       -> ets:tab2list(l2ea(Tab));
+ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],l2ea(Tab));
 ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
 ets({insert,Tab,KVs}) -> ets:insert(l2ea(Tab),unpack(KVs));
 ets({get,Tab,Key})    -> element(2,hd(ets:lookup(l2ea(Tab),l2b(Key))));
