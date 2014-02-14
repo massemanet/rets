@@ -1,6 +1,6 @@
 REBAR = ./rebar
 
-.PHONY: all clean deps
+.PHONY: all clean deps eunit xref release
 
 all:
 	@$(REBAR) compile
@@ -12,6 +12,12 @@ clean:
 eunit:
 	@$(REBAR) eunit skip_deps=true
 
+xref: all
+	@$(REBAR) xref skip_deps=true
+
+release: xref eunit
+	./release.sh
+
 deps:
-	./rebar get-deps
-	./rebar update-deps
+	@$(REBAR) get-deps
+	@$(REBAR) update-deps
