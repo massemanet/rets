@@ -6,7 +6,7 @@ function usage () {
 }
 
 [ -f $PWD/src/*.app.src ] && APPSRC=`echo $PWD/src/*.app.src` || usage
-if [ -z "$1"]; then
+if [ -z "$1" ]; then
     size="patch"
 else
     size=$1
