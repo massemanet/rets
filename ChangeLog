@@ -1,9 +1,26 @@
-commit fc33ab26fc3cdfaae00542d35b693deb8d18a331
+commit c90b50251bd4eddde6ec199470aacdcf0d227fb2
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:06:47 2014 +0100
+
+    v0.3.4
+
+src/rets.app.src
+
+commit d0c9117fdd1edd66e0e363ea9da3af5b714b40c8
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:06:38 2014 +0100
+
+    typo
+
+release.sh
+
+commit b09403c1b11ea7701168c0ba26b6ec8a6f5575a6
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Feb 14 12:05:23 2014 +0100
 
     v0.3.3
 
+ChangeLog
 src/rets.app.src
 
 commit 9a68ce46e87aaf880e2586624a643a64eaaa6ff2
