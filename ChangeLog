@@ -1,9 +1,53 @@
-commit 736ad1390de49ee5a2fffce2dfa018ae96c09e09
+commit fea72d3f50a33de23addf2246e69cb69eaf8ec0e
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:02:02 2014 +0100
+
+    v0.3.2
+
+src/rets.app.src
+
+commit 45e00b078240c730b184f7ab0346b10d2110a98e
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:01:34 2014 +0100
+
+    make rets_client:get turn binary strings into atoms, turn off with 'no_atoms'
+    opt
+
+src/rets.erl
+src/rets_client.erl
+
+commit 0f707ae8bfa8ced2eca1a171c1358f1ba948247a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 12:00:21 2014 +0100
+
+    make rets GET on a table return a list of keys
+
+src/rets.erl
+
+commit bbed72695783d9b6c529a2fadcdc9d0b25c847dc
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 11:59:25 2014 +0100
+
+    work around R15/R16 compatibility issue in httpd_response
+
+rebar.config.script
+src/mod_fun.erl
+
+commit 70f18b42f7163f432bc9beb530ee3ed694595f18
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Feb 14 11:58:14 2014 +0100
+
+    add release target
+
+Makefile
+
+commit 1445d9097353c79997e09188b597815184f1fa88
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Feb 14 11:56:22 2014 +0100
 
     v0.3.1
 
+ChangeLog
 src/rets.app.src
 
 commit 42ae9979667b1d04c744932a22d6582928680a12
