@@ -1,22 +1,24 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:           someapp
+# Provides:           rets
 # Required-Start:     $remote_fs $network
 # Required-Stop:      $remote_fs $network
 # Default-Start:      2 3 4 5
 # Default-Stop:       0 1 6
-# Short-Description:  Start someapp
+# Short-Description:  Start rets
 ### END INIT INFO
 #
 # make a link to this file from etc/init.d;
 # ln -s <this file> /etc/init.d/
+# or copy
+# cp <this file> /etc/init.d/
 #
 # create the runlevel-links like this;
-# sudo update-rc.d someapp defaults 50
+# sudo update-rc.d rets defaults 50
 #
 # now this should work;
-# invoke-rc.d someapp start
-# invoke-rc.d someapp stop
+# invoke-rc.d rets start
+# invoke-rc.d rets stop
 
 # $1 is a list of dirs. return the first dir that is writable.
 tryt() {
