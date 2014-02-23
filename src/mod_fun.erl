@@ -73,14 +73,13 @@ defer_response(#mod{data=Data}) ->
            path="",
            length=0,
            chunked_send_p,
+           mime_type,
            timeout}).
 
 %% we spawn into the handler fun, monitors it, and waits for data chunks.
 handle(M) ->
   Self = self(),
   {Mod,Fun} = mod_get(M,handler_function),
-  S = #s{chunked_send_p=chunked_send_p(M),
-         timeout=mod_get(M,handler_timeout)},
   Act = fun(defer)          -> exit(defer);
            ({redirect,URL}) -> exit({redirect,URL});
            (L)              -> Self ! {self(),L}
@@ -88,7 +87,18 @@ handle(M) ->
   Mpl = lists:zip(record_info(fields,mod),tl(tuple_to_list(M))),
   Req = fun(all) -> proplists:unfold(Mpl);
            (Key) -> proplists:get_value(Key,Mpl) end,
+  S = #s{chunked_send_p=chunked_send_p(M),
+         timeout=mod_get(M,handler_timeout),
+         mime_type=mime_type(Req(request_uri),M)},
   loop(spawn_monitor(fun() -> Mod:Fun(Act,Req) end),S,M).
+
+mime_type(URI,M) ->
+  httpd_util:lookup_mime_default(M#mod.config_db,suffix(URI),"text/html").
+
+suffix(URI) ->
+  try tl(filename:extension(URI))
+  catch _:_ -> []
+  end.
 
 mod_get(M,Key) ->
   httpd_util:lookup(M#mod.config_db,Key,default(Key)).
@@ -96,15 +106,14 @@ mod_get(M,Key) ->
 loop({Pid,Ref},S,M) ->
   Timeout = S#s.timeout,
   receive
-    {Pid,Chunk} -> loop({Pid,Ref},chunk(Chunk,S,M),M);
+    {Pid,Chunk} ->
+      loop({Pid,Ref},chunk(Chunk,S,M),M);
     {'DOWN',Ref,_,Pid,Reason} ->
       case {S#s.state,Reason} of
-        {sent_headers,defer} -> twohundred(M,S);
+        {has_headers,normal} -> twohundred(M,S);
+        {sent_headers,_}     -> twohundred(M,S);
         {_,defer}            -> M#mod.data;
         {_,{redirect,URL}}   -> threeohone(M,S,URL);
-        {init,normal}        -> fourohfour(M,S);
-        {_,normal}           -> twohundred(M,S);
-        {sent_headers,_}     -> twohundred(M,S);
         {_,_}                -> fourohfour(M,S)
       end
   after
@@ -142,7 +151,7 @@ chunk(Chnk,S,M) ->
   Chunk = to_list(Chnk),
   case S#s.state of
     init ->
-      {Headers,Body} = check_headers(Chunk),
+      {Headers,Body} = check_headers(Chunk,S),
       case S#s.chunked_send_p of
         true ->
           send_header(M,200,[{"transfer-encoding","chunked"}|Headers]),
@@ -162,10 +171,10 @@ chunk(Chnk,S,M) ->
       S
   end.
 
-check_headers(Chunk) ->
+check_headers(Chunk,S) ->
   case is_headers(Chunk) of
     true -> {Chunk,""};
-    false-> {[{"content-type","text/html"}],Chunk}
+    false-> {[{"content-type",S#s.mime_type}],Chunk}
   end.
 
 is_headers([{_,_}|L]) -> is_headers(L);
