@@ -59,6 +59,7 @@ do(Act,Req) ->
     {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
     {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
     {"POST",  [Tab]    } -> Act(je(ets({insert,Tab,Req(entity_body)})));
+    {"POST",  [Tab,Key]} -> Act(je(ets({counter,Tab,Key})));
     {"DELETE",[Tab]    } -> Act(je(gcall({delete,Tab})));
     {"DELETE",[Tab,Key]} -> Act(je(ets({delete,Tab,Key})));
     _                    -> Act(je(Req(all)))
@@ -67,8 +68,14 @@ do(Act,Req) ->
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],l2ea(Tab));
 ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
 ets({insert,Tab,KVs}) -> ets:insert(l2ea(Tab),unpack(KVs));
+ets({counter,Tab,Key})-> update_counter(Tab,Key);
 ets({get,Tab,Key})    -> element(2,hd(ets:lookup(l2ea(Tab),l2b(Key))));
 ets({delete,Tab,Key}) -> ets:delete(l2ea(Tab),l2b(Key)).
+
+update_counter(Tab,Key) ->
+  try ets:update_counter(Tab,Key,1)
+  catch _:_ -> ets:insert(Tab,{Key,1}),1
+  end.
 
 unpack(KVs) ->
   {PL} = jd(KVs),
