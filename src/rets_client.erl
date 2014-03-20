@@ -6,12 +6,14 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/2,get/3,get/4,
+-export([get/1,get/2,get/3,get/4,
          delete/2,delete/3,
          put/2,put/4,
          post/3,
          trace/1,trace/2]).
 
+get(Host) ->
+  get(Host,"").
 get(Host,Tab) ->
   get(Host,Tab,"").
 get(Host,Tab,Key) ->
