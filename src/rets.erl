@@ -65,7 +65,7 @@ do(Act,Req) ->
     {"POST",  [Tab]    ,[]} -> Act(je(ets({insert,Tab,Req(entity_body)})));
     {"DELETE",[Tab]    ,[]} -> Act(je(gcall({delete,Tab})));
     {"DELETE",[Tab,Key],[]} -> Act(je(ets({delete,Tab,Key})));
-    _                    -> Act(io_lib:format("~p",[Req(all)]))
+    _                       -> Act(io_lib:format("~p",[Req(all)]))
   end.
 
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],l2ea(Tab));
