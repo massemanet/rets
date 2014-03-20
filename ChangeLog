@@ -1,9 +1,26 @@
-commit fcb382ed7d257a838fbf93bf98b117d212707f4a
+commit 234a01c476a84d3fd52c1b2e12744be635a56bfc
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:53:27 2014 +0100
+
+    v0.4.3
+
+src/rets.app.src
+
+commit 169735abc1fd80d39ee27abb1e78b48836e777f0
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:52:48 2014 +0100
+
+    implement get/1
+
+src/rets_client.erl
+
+commit 8c10d2404c4e937bac5330c1ce751f998495c36a
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Mar 20 15:38:28 2014 +0100
 
     v0.4.2
 
+ChangeLog
 src/rets.app.src
 
 commit dbfcacea5da5c36af537a9fef68eeff3099b5be3
