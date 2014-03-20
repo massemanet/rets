@@ -20,7 +20,7 @@ start() ->
 %% supervisor callback
 start_link() ->
   [inets:start() || not is_started(inets)],
-  inets:start(httpd,conf()),
+  inets:start(httpd,conf(),stand_alone),
   rets_tables:start_link().
 
 conf() ->
