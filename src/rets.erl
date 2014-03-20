@@ -52,29 +52,40 @@ ensure(X) ->
 %% if we don't want to handle the request, we do Act(defer)
 %% if we crash, there will be a 404.
 do(Act,Req) ->
-  case {Req(method),string:tokens(Req(request_uri),"/")} of
-    {"GET",   []       } -> Act(je([l2b(T)||T<-gcall({all,[]})]));
-    {"GET",   [Tab]    } -> Act(je(ets({keys,Tab})));
-    {"GET",   [Tab,Key]} -> Act(ets({get,Tab,Key}));
-    {"PUT",   [Tab]    } -> Act(je(gcall({create,Tab})));
-    {"PUT",   [Tab,Key]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
-    {"POST",  [Tab]    } -> Act(je(ets({insert,Tab,Req(entity_body)})));
-    {"POST",  [Tab,Key]} -> Act(je(ets({counter,Tab,Key})));
-    {"DELETE",[Tab]    } -> Act(je(gcall({delete,Tab})));
-    {"DELETE",[Tab,Key]} -> Act(je(ets({delete,Tab,Key})));
-    _                    -> Act(je(Req(all)))
+  URI = string:tokens(Req(request_uri),"/"),
+  HeaderTrue = [K || {K,"true"} <- Req(parsed_header)],
+  case {Req(method),URI,HeaderTrue} of
+    {"GET",   []       ,[]} -> Act(je([l2b(T)||T<-gcall({all,[]})]));
+    {"GET",   [Tab]    ,[]} -> Act(je(ets({keys,Tab})));
+    {"GET",   [Tab,Key],[]} -> Act(ets({get,Tab,Key}));
+    {"PUT",   [Tab]    ,[]} -> Act(je(gcall({create,Tab})));
+    {"PUT",   [Tab,Key],["counter"]} -> Act(ets({counter,Tab,Key}));
+    {"PUT",   [Tab,Key],["reset"]}   -> Act(ets({reset,Tab,Key}));
+    {"PUT",   [Tab,Key],[]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
+    {"POST",  [Tab]    ,[]} -> Act(je(ets({insert,Tab,Req(entity_body)})));
+    {"DELETE",[Tab]    ,[]} -> Act(je(gcall({delete,Tab})));
+    {"DELETE",[Tab,Key],[]} -> Act(je(ets({delete,Tab,Key})));
+    _                    -> Act(io_lib:format("~p",[Req(all)]))
   end.
 
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],l2ea(Tab));
 ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
 ets({insert,Tab,KVs}) -> ets:insert(l2ea(Tab),unpack(KVs));
-ets({counter,Tab,Key})-> update_counter(Tab,Key);
-ets({get,Tab,Key})    -> element(2,hd(ets:lookup(l2ea(Tab),l2b(Key))));
+ets({counter,Tab,Key})-> update_counter(l2ea(Tab),l2b(Key));
+ets({reset,Tab,Key})  -> ets:insert(l2ea(Tab),{l2b(Key),0}),"0";
+ets({get,Tab,Key})    -> getter(l2ea(Tab),l2b(Key));
 ets({delete,Tab,Key}) -> ets:delete(l2ea(Tab),l2b(Key)).
 
+getter(Tab,Key) ->
+  [{Key,Res}] = ets:lookup(Tab,Key),
+  case is_integer(Res) of
+    true -> integer_to_list(Res);
+    false-> Res
+  end.
+
 update_counter(Tab,Key) ->
-  try ets:update_counter(Tab,Key,1)
-  catch _:_ -> ets:insert(Tab,{Key,1}),1
+  try integer_to_list(ets:update_counter(Tab,Key,1))
+  catch _:_ -> ets:insert(Tab,{Key,1}),"1"
   end.
 
 unpack(KVs) ->

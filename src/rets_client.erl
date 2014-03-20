@@ -6,7 +6,11 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/2,get/3,get/4,delete/2,delete/3,put/2,put/4,post/3]).
+-export([get/2,get/3,get/4,
+         delete/2,delete/3,
+         put/2,put/4,
+         post/3,
+         trace/1,trace/2]).
 
 get(Host,Tab) ->
   get(Host,Tab,"").
@@ -34,6 +38,14 @@ delete(Host,Tab,Key) ->
 
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
+put(Host,Tab,Key,counter) ->
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(put,{url(Host,Tab,Key),[{"counter","true"}],[],[]},[],[]),
+  {Status,list_to_integer(Reply)};
+put(Host,Tab,Key,reset) ->
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(put,{url(Host,Tab,Key),[{"reset","true"}],[],[]},[],[]),
+  {Status,list_to_integer(Reply)};
 put(Host,Tab,Key,PL) ->
   {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
     httpc:request(put,{url(Host,Tab,Key),[],[],enc(prep(PL))},[],[]),
@@ -44,6 +56,14 @@ post(Host,Tab,PL) ->
     httpc:request(post,{url(Host,Tab,""),[],[],enc(prep(PL))},[],[]),
   {Status,Reply}.
 
+trace(Host) ->
+  trace(Host,[]).
+trace(Host,Headers) ->
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(trace,{url(Host,"",""),Headers},[],[]),
+  {Status,Reply}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 url(Host,Tab,Key) ->
   "http://"++to_list(Host)++":8765/"++to_list(Tab)++"/"++to_list(Key).
 
