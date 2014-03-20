@@ -1,9 +1,67 @@
-commit c7b6d9971c40fca4334da0541d233c2f18162019
+commit fcb382ed7d257a838fbf93bf98b117d212707f4a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:38:28 2014 +0100
+
+    v0.4.2
+
+src/rets.app.src
+
+commit dbfcacea5da5c36af537a9fef68eeff3099b5be3
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:37:37 2014 +0100
+
+    make application:stop stop the http server
+
+src/rets.erl
+
+commit a9508d5a5a449e295c8db2e55093b4f25ea50f3f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:18:31 2014 +0100
+
+    counter test
+
+src/rets.erl
+
+commit 0a21eb8785db47ef12161976c358d244faab77c4
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:13:02 2014 +0100
+
+    cosmetic
+
+src/rets.erl
+
+commit 77ec2a9f5d42f433ac6b3b70ba1c95022b594a8a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Mar 20 15:10:45 2014 +0100
+
+    implement support for counters
+
+src/rets.erl
+src/rets_client.erl
+
+commit 4b77e14ddebc0c1dd56fae127acdb5e2baa4f044
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Mar 19 21:03:27 2014 +0100
+
+    update_counter
+
+src/rets.erl
+
+commit 258b4c7cd3e71589991fd0466790d3fa0b14dd93
+Author: mats cronqvist <masse@klarna.com>
+Date:   Sun Feb 23 19:15:51 2014 +0100
+
+    handle mime-types
+
+src/mod_fun.erl
+
+commit 0661d9fb6c8932ad95ec2f944bdf7124fc2206a7
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Feb 14 15:34:42 2014 +0100
 
     v0.4.1
 
+ChangeLog
 src/rets.app.src
 
 commit 80d0d7457cffed76918cb4ddae24b4321367abc4
