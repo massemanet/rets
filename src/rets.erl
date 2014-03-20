@@ -151,3 +151,13 @@ t02_test() ->
                {200,<<"bBbB">>}),
   ?assertEqual(rets_client:get(localhost,tibbe,ddd,[no_atoms]),
                {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
+
+t03_test() ->
+  application:stop(rets),
+  application:start(rets),
+  rets_client:put(localhost,tibbe),
+  ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)),
+  ?assertEqual({200,2}, rets_client:put(localhost,tibbe,bbb,counter)),
+  ?assertEqual({200,2}, rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,0}, rets_client:put(localhost,tibbe,bbb,reset)),
+  ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)).
