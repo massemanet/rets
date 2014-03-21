@@ -19,14 +19,12 @@ get(Host,Tab) ->
 get(Host,Tab,Key) ->
   get(Host,Tab,Key,[]).
 get(Host,Tab,Key,Opts) ->
-  case httpc:request(get,{url(Host,Tab,Key),[]},[],[]) of
-    {ok,{{_HttpVersion,200,_StatusText},_Headers,Reply}} ->
+  case httpc_request(get,Host,Tab,Key,[]) of
+    {200,Reply} ->
       case dec(Reply) of
         {PL} -> {200,maybe_atomize(PL,Opts)};
         X    -> {200,maybe_atomize(X,Opts)}
       end;
-    {ok,{{_HttpVersion,Status,StatusText},_Headers,Reply}} ->
-      {error, {Status,StatusText,Reply}};
     Error ->
       Error
   end.
@@ -34,38 +32,42 @@ get(Host,Tab,Key,Opts) ->
 delete(Host,Tab) ->
   delete(Host,Tab,"").
 delete(Host,Tab,Key) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(delete,{url(Host,Tab,Key),[]},[],[]),
-  {Status,Reply}.
+  httpc_request(delete,Host,Tab,Key,[]).
 
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(put,{url(Host,Tab,Key),[{"counter","true"}],[],[]},[],[]),
+  {Status,Reply} = httpc_request(put,Host,Tab,Key,[{"counter","true"}],[]),
   {Status,list_to_integer(Reply)};
 put(Host,Tab,Key,reset) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(put,{url(Host,Tab,Key),[{"reset","true"}],[],[]},[],[]),
+  {Status,Reply} = httpc_request(put,Host,Tab,Key,[{"reset","true"}],[]),
   {Status,list_to_integer(Reply)};
 put(Host,Tab,Key,PL) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(put,{url(Host,Tab,Key),[],[],enc(prep(PL))},[],[]),
-  {Status,Reply}.
+  httpc_request(put,Host,Tab,Key,[],PL).
 
 post(Host,Tab,PL) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(post,{url(Host,Tab,""),[],[],enc(prep(PL))},[],[]),
-  {Status,Reply}.
+  httpc_request(post,Host,Tab,"",[],PL).
 
 trace(Host) ->
   trace(Host,[]).
 trace(Host,Headers) ->
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(trace,{url(Host,"",""),Headers},[],[]),
-  {Status,Reply}.
+  httpc_request(trace,Host,"","",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+httpc_request(M,Host,Tab,Key,Headers) when M==trace;M==get;M==delete ->
+  start_app(inets),
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(M,{url(Host,Tab,Key),Headers},[],[]),
+  {Status,Reply}.
+httpc_request(M,Host,Tab,Key,Headers,PL) when M==post;M==put ->
+  start_app(inets),
+  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
+    httpc:request(M,{url(Host,Tab,Key),Headers,[],enc(prep(PL))},[],[]),
+  {Status,Reply}.
+
+start_app(M) ->
+  [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
+
 url(Host,Tab,Key) ->
   "http://"++to_list(Host)++":8765/"++to_list(Tab)++"/"++to_list(Key).
 
