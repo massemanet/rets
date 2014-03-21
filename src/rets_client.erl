@@ -37,11 +37,9 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  {Status,Reply} = httpc_request(put,Host,Tab,Key,[{"counter","true"}],[]),
-  {Status,list_to_integer(Reply)};
+  put_counter(Host,Tab,Key,"counter");
 put(Host,Tab,Key,reset) ->
-  {Status,Reply} = httpc_request(put,Host,Tab,Key,[{"reset","true"}],[]),
-  {Status,list_to_integer(Reply)};
+  put_counter(Host,Tab,Key,"reset");
 put(Host,Tab,Key,PL) ->
   httpc_request(put,Host,Tab,Key,[],PL).
 
@@ -54,6 +52,12 @@ trace(Host,Headers) ->
   httpc_request(trace,Host,"","",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+put_counter(Host,Tab,Key,Header) ->
+  case httpc_request(put,Host,Tab,Key,[{Header,"true"}],[]) of
+    {200,Reply} -> {200,list_to_integer(Reply)};
+    {Status,Reply} -> {Status,Reply}
+  end.
+
 httpc_request(M,Host,Tab,Key,Headers) when M==trace;M==get;M==delete ->
   start_app(inets),
   {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
