@@ -1,9 +1,42 @@
-commit 234a01c476a84d3fd52c1b2e12744be635a56bfc
+commit 9707c1c6a4048387c2a9254b313b22016a048e3b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Apr 3 15:12:55 2014 +0200
+
+    v0.4.4
+
+src/rets.app.src
+
+commit 95dc2a6a1aa993b37bb878120602485bfe7e24c8
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Apr 3 15:12:29 2014 +0200
+
+    remove eper as a dep
+
+rebar.config
+
+commit 2b8a799fc4acdc1e60f2ef866acf9f0717354897
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Mar 21 14:29:02 2014 +0100
+
+    handle counter errors
+
+src/rets_client.erl
+
+commit 37bf6a38150a883e4df6cad85311fb080902e5ce
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Mar 21 14:03:21 2014 +0100
+
+    assert that inets is started in rets_client
+
+src/rets_client.erl
+
+commit 041fe21090887ac5f27dec18ebe3dbc2a0006e4e
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Mar 20 15:53:27 2014 +0100
 
     v0.4.3
 
+ChangeLog
 src/rets.app.src
 
 commit 169735abc1fd80d39ee27abb1e78b48836e777f0

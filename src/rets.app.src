@@ -1,7 +1,7 @@
 {application, rets,
  [
   {description, "rest wrapper around ets"},
-  {vsn, "0.4.3"},
+  {vsn, "0.4.4"},
   {registered, []},
   {applications, [
                   kernel,
