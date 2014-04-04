@@ -59,15 +59,25 @@ put_counter(Host,Tab,Key,Header) ->
   end.
 
 httpc_request(M,Host,Tab,Key,Headers) when M==trace;M==get;M==delete ->
-  start_app(inets),
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(M,{url(Host,Tab,Key),Headers},[],[]),
-  {Status,Reply}.
+  httpc_request(fun() -> httpc_request(M,url(Host,Tab,Key),Headers) end).
+
 httpc_request(M,Host,Tab,Key,Headers,PL) when M==post;M==put ->
+  httpc_request(fun() -> httpc_request(M,url(Host,Tab,Key),Headers,PL) end).
+
+httpc_request(HTTPCreq) ->
   start_app(inets),
-  {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} =
-    httpc:request(M,{url(Host,Tab,Key),Headers,[],enc(prep(PL))},[],[]),
-  {Status,Reply}.
+  case HTTPCreq() of
+    {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
+      {Status,Reply};
+    Error->
+      Error
+  end.
+
+httpc_request(M,URL,Headers) ->
+  httpc:request(M,{URL,Headers},[],[]).
+
+httpc_request(M,URL,Headers,PL) ->
+  httpc:request(M,{URL,Headers,[],enc(prep(PL))},[],[]).
 
 start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].

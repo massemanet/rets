@@ -20,7 +20,7 @@ start() ->
 %% supervisor callback
 start_link() ->
   [inets:start() || not is_started(inets)],
-  inets:start(httpd,conf(),stand_alone),
+  {ok,_} = inets:start(httpd,conf(),stand_alone),
   rets_tables:start_link().
 
 conf() ->
@@ -110,54 +110,74 @@ je(Term) ->
 %%%%%%%%%%
 %% eunit
 t00_test() ->
-  application:stop(rets),
-  application:start(rets),
-  rets_client:put(localhost,tibbe),
-  rets_client:post(localhost,tibbe,[{aaa,"AAA"},{bbb,bBbB},{ccc,123.1},
-                                    {ddd,[{a,"A"},{b,b},{c,123.3}]}]),
-  ?assertEqual(rets_client:get(localhost,tibbe,aaa),
-               {200,"AAA"}),
-  ?assertEqual(rets_client:get(localhost,tibbe,bbb),
-               {200,bBbB}),
-  ?assertEqual(rets_client:get(localhost,tibbe,ccc),
-               {200,123.1}),
-  ?assertEqual(rets_client:get(localhost,tibbe,ddd),
-               {200,[{a,"A"},{b,b},{c,123.3}]}).
+  start_rets(),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:post(localhost,tibbe,
+                                [{aaa,"AAA"},{bbb,bBbB},{ccc,123.1},
+                                 {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
+  ?assertEqual({200,"AAA"},
+               rets_client:get(localhost,tibbe,aaa)),
+  ?assertEqual({200,bBbB},
+               rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,123.1},
+               rets_client:get(localhost,tibbe,ccc)),
+  ?assertEqual({200,[{a,"A"},{b,b},{c,123.3}]},
+               rets_client:get(localhost,tibbe,ddd)).
 
 t01_test() ->
-  application:stop(rets),
-  application:start(rets),
-  rets_client:put(localhost,tibbe),
-  rets_client:put(localhost,tibbe,aaa,"AAA"),
-  rets_client:put(localhost,tibbe,bbb,bBbB),
-  rets_client:put(localhost,tibbe,ccc,123.1),
-  rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}]),
-  ?assertEqual(rets_client:get(localhost,tibbe,aaa),
-               {200,"AAA"}),
-  ?assertEqual(rets_client:get(localhost,tibbe,bbb),
-               {200,bBbB}),
-  ?assertEqual(rets_client:get(localhost,tibbe,ccc),
-               {200,123.1}),
-  ?assertEqual(rets_client:get(localhost,tibbe,ddd),
-               {200,[{a,"A"},{b,b},{c,123.3}]}).
+  start_rets(),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,aaa,"AAA")),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,bbb,bBbB)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,ccc,123.1)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
+  ?assertEqual({200,"AAA"},
+               rets_client:get(localhost,tibbe,aaa)),
+  ?assertEqual({200,bBbB},
+               rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,123.1},
+               rets_client:get(localhost,tibbe,ccc)),
+  ?assertEqual({200,[{a,"A"},{b,b},{c,123.3}]},
+               rets_client:get(localhost,tibbe,ddd)).
 
 t02_test() ->
-  application:stop(rets),
-  application:start(rets),
-  rets_client:put(localhost,tibbe),
-  rets_client:put(localhost,tibbe,bbb,bBbB),
-  rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}]),
-  ?assertEqual(rets_client:get(localhost,tibbe,bbb,[no_atoms]),
-               {200,<<"bBbB">>}),
-  ?assertEqual(rets_client:get(localhost,tibbe,ddd,[no_atoms]),
-               {200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]}).
+  start_rets(),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,bbb,bBbB)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
+  ?assertEqual({200,<<"bBbB">>},
+               rets_client:get(localhost,tibbe,bbb,[no_atoms])),
+  ?assertEqual({200,[{<<"a">>,"A"},{<<"b">>,<<"b">>},{<<"c">>,123.3}]},
+               rets_client:get(localhost,tibbe,ddd,[no_atoms])).
 
 t03_test() ->
-  application:stop(rets),
-  application:start(rets),
-  rets_client:put(localhost,tibbe),
+  start_rets(),
+  ?assertEqual({200,"true"}, rets_client:put(localhost,tibbe)),
   ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)),
   ?assertEqual({200,2}, rets_client:put(localhost,tibbe,bbb,counter)),
   ?assertEqual({200,2}, rets_client:get(localhost,tibbe,bbb)),
   ?assertEqual({200,0}, rets_client:put(localhost,tibbe,bbb,reset)),
   ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)).
+
+start_rets() ->
+  application:stop(rets),
+  wait_for_rets().
+
+wait_for_rets() ->
+  case application:start(rets) of
+    ok -> ok;
+    _ ->
+      erlang:display(waiting_for_shutdown),
+      receive after 200 -> ok end,
+      wait_for_rets()
+  end.
