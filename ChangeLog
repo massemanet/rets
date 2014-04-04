@@ -1,9 +1,27 @@
-commit 9707c1c6a4048387c2a9254b313b22016a048e3b
+commit 003fb7e57562770ee7f4fcf69c67f27e4cfa67eb
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Apr 4 16:19:11 2014 +0200
+
+    v0.4.5
+
+src/rets.app.src
+
+commit 2e28302e5b74d80f23205ea2fece7b716e9cdc41
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Apr 4 16:13:10 2014 +0200
+
+    fix unit tests
+
+src/rets.erl
+src/rets_client.erl
+
+commit 9aede5b4cd123a2ad0f1d12569502e345de6b4ae
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Apr 3 15:12:55 2014 +0200
 
     v0.4.4
 
+ChangeLog
 src/rets.app.src
 
 commit 95dc2a6a1aa993b37bb878120602485bfe7e24c8
