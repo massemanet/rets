@@ -1,9 +1,28 @@
-commit 003fb7e57562770ee7f4fcf69c67f27e4cfa67eb
+commit 4821dc15f984f3823716096cc031b293606c231a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Apr 4 16:22:48 2014 +0200
+
+    v0.4.6
+
+src/rets.app.src
+
+commit 8c92975614c05f4cb85679331bfbe3f61da46e99
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Apr 4 16:22:28 2014 +0200
+
+    move release.sh to bin
+
+Makefile
+bin/release.sh
+release.sh
+
+commit 9d95d39dda475bf13543dfe1d69cef9045f81968
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Apr 4 16:19:11 2014 +0200
 
     v0.4.5
 
+ChangeLog
 src/rets.app.src
 
 commit 2e28302e5b74d80f23205ea2fece7b716e9cdc41
