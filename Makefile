@@ -16,13 +16,13 @@ xref: all
 	@$(REBAR) xref skip_deps=true
 
 release_major: xref eunit
-	./release.sh major
+	./bin/release.sh major
 
 release_minor: xref eunit
-	./release.sh minor
+	./bin/release.sh minor
 
 release: xref eunit
-	./release.sh patch
+	./bin/release.sh patch
 
 deps:
 	@$(REBAR) get-deps
