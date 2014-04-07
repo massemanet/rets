@@ -171,13 +171,24 @@ t03_test() ->
 
 start_rets() ->
   application:stop(rets),
-  wait_for_rets().
+  start_and_wait().
 
-wait_for_rets() ->
+start_and_wait() ->
   case application:start(rets) of
-    ok -> ok;
+    ok ->
+      wait_for_start();
     _ ->
       erlang:display(waiting_for_shutdown),
       receive after 200 -> ok end,
-      wait_for_rets()
+      start_and_wait()
+  end.
+
+wait_for_start() ->
+  case whereis(httpd_8765) of
+    undefined ->
+      erlang:display(waiting_for_startup),
+      receive after 200 -> ok end,
+      wait_for_start();
+    _ ->
+      ok
   end.
