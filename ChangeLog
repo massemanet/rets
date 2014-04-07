@@ -1,9 +1,26 @@
-commit 4821dc15f984f3823716096cc031b293606c231a
+commit 21b365e82d88d1c92150221df94f3986e914d7fb
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Apr 7 11:10:18 2014 +0200
+
+    v0.4.7
+
+src/rets.app.src
+
+commit 8edbf8d7dfc1483828497e43fc38dfa3d3617a3f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Apr 7 11:05:22 2014 +0200
+
+    wait for application to start/stop
+
+src/rets.erl
+
+commit 67e1436c3cb5b42d9c7ac8c45aa8c4254de5ba90
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Apr 4 16:22:48 2014 +0200
 
     v0.4.6
 
+ChangeLog
 src/rets.app.src
 
 commit 8c92975614c05f4cb85679331bfbe3f61da46e99
