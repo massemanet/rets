@@ -24,13 +24,17 @@ start_link() ->
   rets_tables:start_link().
 
 conf() ->
-  Root = filename:join("/tmp",?MODULE),
+  LogRoot =
+    case application:get_env(kernel,error_logger) of
+      {ok,{file,F}} -> filename:dirname(F);
+      _             -> filename:join("/tmp",atom_to_list(?MODULE))
+    end,
   [{port, 8765},
    {server_name,atom_to_list(?MODULE)},
-   {server_root,ensure(Root)},
-   {document_root,ensure(Root)},
-   {modules, [mod_alias,mod_fun,mod_log]},
-   {error_log,filename:join(ensure(Root),"errors.log")},
+   {server_root,code:lib_dir(?MODULE)},
+   {document_root,static()},
+   {modules, [mod_fun,mod_log]},
+   {error_log,filename:join(ensure(LogRoot),"errors.log")},
    {handler_function,{?MODULE,do}},
    {mime_types,[{"html","text/html"},
                 {"css","text/css"},
@@ -43,6 +47,9 @@ is_started(A) ->
 ensure(X) ->
   filelib:ensure_dir(X++"/"),
   X.
+
+static() ->
+  filename:join(code:priv_dir(?MODULE),"static").
 
 %% called from mod_fun. runs in a fresh process.
 %% Req is a dict with the request data from inets. It is implemented

@@ -166,9 +166,7 @@ chunk(Chnk,S,M) ->
       send_chunk(M,Chunk),
       S#s{length=Len};
     has_headers ->
-      S#s{chunks=S#s.chunks++Chunk};
-    _ ->
-      S
+      S#s{chunks=S#s.chunks++Chunk}
   end.
 
 check_headers(Chunk,S) ->
