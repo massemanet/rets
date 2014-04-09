@@ -32,7 +32,7 @@ conf() ->
   [{port, 8765},
    {server_name,atom_to_list(?MODULE)},
    {server_root,code:lib_dir(?MODULE)},
-   {document_root,static()},
+   {document_root,code:lib_dir(?MODULE)},
    {modules, [mod_fun,mod_log]},
    {error_log,filename:join(ensure(LogRoot),"errors.log")},
    {handler_function,{?MODULE,do}},
@@ -47,9 +47,6 @@ is_started(A) ->
 ensure(X) ->
   filelib:ensure_dir(X++"/"),
   X.
-
-static() ->
-  filename:join(code:priv_dir(?MODULE),"static").
 
 %% called from mod_fun. runs in a fresh process.
 %% Req is a dict with the request data from inets. It is implemented
