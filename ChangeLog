@@ -1,9 +1,35 @@
-commit 21b365e82d88d1c92150221df94f3986e914d7fb
+commit 88573f10ac8dbfa138ca1ef3ebb31ef96f08cd0a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Apr 9 11:59:39 2014 +0200
+
+    v0.4.8
+
+src/rets.app.src
+
+commit 4e97bc052c1dfbe5a9c06c2e3f88dcd840daf613
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Apr 9 11:57:22 2014 +0200
+
+    dummy document_root
+
+src/rets.erl
+
+commit 085855e1849543b973c24dff5cb46b22ae63a466
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Apr 9 11:49:50 2014 +0200
+
+    remove inets cruft
+
+src/mod_fun.erl
+src/rets.erl
+
+commit 237caab6200248430329cdd3378874341f6e1af5
 Author: mats cronqvist <masse@klarna.com>
 Date:   Mon Apr 7 11:10:18 2014 +0200
 
     v0.4.7
 
+ChangeLog
 src/rets.app.src
 
 commit 8edbf8d7dfc1483828497e43fc38dfa3d3617a3f
