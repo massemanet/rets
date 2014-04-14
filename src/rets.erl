@@ -178,6 +178,7 @@ start_rets() ->
   start_and_wait().
 
 start_and_wait() ->
+  receive after 200 -> ok end,
   case application:start(rets) of
     ok ->
       wait_for_start();
