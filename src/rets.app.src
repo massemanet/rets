@@ -1,9 +1,11 @@
+%% -*- mode: erlang; erlang-indent-level: 2 -*-
 {application, rets,
  [
   {description, "rest wrapper around ets"},
   {vsn, "0.4.8"},
   {registered, []},
   {applications, [
+                  cowboy,
                   kernel,
                   stdlib
                  ]},

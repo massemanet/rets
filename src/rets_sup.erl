@@ -21,7 +21,7 @@ start_link() ->
 
 init([]) ->
   {ok, {{one_for_one, 5, 10},
-        [child(rets,worker)]}}.
+        [child(rets_tables,[])]}}.
 
-child(I, Type) ->
-  {I, {I, start_link, []}, permanent, 5000, Type, [I]}.
+child(Mod,Args) ->
+  {Mod, {Mod, start_link, Args}, permanent, 5000, worker, [Mod]}.

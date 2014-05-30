@@ -7,84 +7,111 @@
 
 -module(rets).
 -author('mats cronqvist').
--export([ start/0,       % start the application
-          start_link/0   % supervisor callback
-         ,do/2]).        % inets mod_fun callback
 
--include_lib("eunit/include/eunit.hrl").
+-export([start/0]).       % start the application
+
+-behavior(cowboy_http_handler).
+-export([handle/2,
+         init/3,
+         terminate/3]).
+
+-export([cowboy_opts/0]).
 
 %% main application starter
 start() ->
+  application:start(ranch),
+  application:start(crypto),
+  application:start(cowlib),
+  application:start(cowboy),
   application:start(rets).
 
-%% supervisor callback
-start_link() ->
-  [inets:start() || not is_started(inets)],
-  {ok,_} = inets:start(httpd,conf(),stand_alone),
-  rets_tables:start_link().
+%% called from rets_app
+cowboy_opts() ->
+  [{name,rets_listener},
+   {acceptors,100},
+   {opts,[{port, 7890}]},
+   {routes,[{'_', [{"/[...]", rets, []}]}]}].
 
-conf() ->
-  LogRoot =
-    case application:get_env(kernel,error_logger) of
-      {ok,{file,F}} -> filename:dirname(F);
-      _             -> filename:join("/tmp",atom_to_list(?MODULE))
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% cowboy callbacks
+init({tcp, http}, Req, []) ->
+  {ok, Req, init}.
+
+terminate(_Reason, _Req, _State) ->
+  ok.
+
+%% called from cowboy. Req is the cowboy opaque state object.
+handle(Req,State) ->
+  {ok,Req2} =
+    try          cow_reply(200,<<"application/json">>,reply(Req),Req)
+    catch _:R -> cow_reply(404,<<"text/plain">>,reply404(R),Req)
     end,
-  [{port, 8765},
-   {server_name,atom_to_list(?MODULE)},
-   {server_root,code:lib_dir(?MODULE)},
-   {document_root,code:lib_dir(?MODULE)},
-   {modules, [mod_fun,mod_log]},
-   {error_log,filename:join(ensure(LogRoot),"errors.log")},
-   {handler_function,{?MODULE,do}},
-   {mime_types,[{"html","text/html"},
-                {"css","text/css"},
-                {"ico","image/x-icon"},
-                {"js","application/javascript"}]}].
+  {ok,Req2,State}.
 
-is_started(A) ->
-  lists:member(A,[X || {X,_,_} <- application:which_applications()]).
+reply404(R) ->
+  "fourohfour - "++flat(R).
 
-ensure(X) ->
-  filelib:ensure_dir(X++"/"),
-  X.
+cow_reply(Status,ContentType,Body,Req) ->
+  cowboy_req:reply(Status,
+                   [{<<"content-type">>, ContentType}],
+                   Body,
+                   Req).
 
-%% called from mod_fun. runs in a fresh process.
-%% Req is a dict with the request data from inets. It is implemented
-%% as a fun/1, with the arg being the key in the dict.
-%% we can deliver the content in chunks by calling Act(Chunk).
-%% the first chunk can be headers; [{Key,Val}]
-%% if we don't want to handle the request, we do Act(defer)
-%% if we crash, there will be a 404.
-do(Act,Req) ->
-  URI = string:tokens(Req(request_uri),"/"),
-  HeaderTrue = [K || {K,"true"} <- Req(parsed_header)],
-  case {Req(method),URI,HeaderTrue} of
-    {"GET",   []       ,[]} -> Act(je([l2b(T)||T<-gcall({all,[]})]));
-    {"GET",   [Tab]    ,[]} -> Act(je(ets({keys,Tab})));
-    {"GET",   [Tab,Key],[]} -> Act(ets({get,Tab,Key}));
-    {"PUT",   [Tab]    ,[]} -> Act(je(gcall({create,Tab})));
-    {"PUT",   [Tab,Key],["counter"]} -> Act(ets({counter,Tab,Key}));
-    {"PUT",   [Tab,Key],["reset"]}   -> Act(ets({reset,Tab,Key}));
-    {"PUT",   [Tab,Key],[]} -> Act(je(ets({insert,Tab,Key,Req(entity_body)})));
-    {"POST",  [Tab]    ,[]} -> Act(je(ets({insert,Tab,Req(entity_body)})));
-    {"DELETE",[Tab]    ,[]} -> Act(je(gcall({delete,Tab})));
-    {"DELETE",[Tab,Key],[]} -> Act(je(ets({delete,Tab,Key})));
-    _                       -> Act(io_lib:format("~p",[Req(all)]))
+reply(Req) ->
+  case {method(Req),uri(Req),true_headers(Req)} of
+    {"PUT",   [Tab,Key],["counter"]} -> ets({counter,Tab,Key});
+    {"PUT",   [Tab,Key],["reset"]}   -> ets({reset,Tab,Key});
+    {"PUT",   [Tab,Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
+    {"PUT",   [Tab]    ,[]}          -> je(gcall({create,Tab}));
+    {"GET",   []       ,[]}          -> je([l2b(T)||T<-gcall({all,[]})]);
+    {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
+    {"GET",   [Tab,Key],[]}          -> ets({get,Tab,Key});
+    {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
+    {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
+    {"DELETE",[Tab,Key],[]}          -> je(ets({delete,Tab,Key}));
+    _ -> throw({method(Req),uri(Req),headers(Req)})
   end.
 
-ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],l2ea(Tab));
-ets({insert,Tab,K,V}) -> ets:insert(l2ea(Tab),{l2b(K),l2b(V)});
-ets({insert,Tab,KVs}) -> ets:insert(l2ea(Tab),unpack(KVs));
-ets({counter,Tab,Key})-> update_counter(l2ea(Tab),l2b(Key));
-ets({reset,Tab,Key})  -> ets:insert(l2ea(Tab),{l2b(Key),0}),"0";
-ets({get,Tab,Key})    -> getter(l2ea(Tab),l2b(Key));
-ets({delete,Tab,Key}) -> ets:delete(l2ea(Tab),l2b(Key)).
+body(Req) ->
+  {ok,Body,_} =
+    case cowboy_req:has_body(Req) of
+      true -> cowboy_req:body(Req);
+      false-> {ok,[],[]}
+    end,
+  Body.
+
+method(Req) ->
+  {Method,_} = cowboy_req:method(Req),
+  binary_to_list(Method).
+
+uri(Req) ->
+  {URI,_} = cowboy_req:path_info(Req),
+  [binary_to_list(B) || B <- URI].
+
+headers(Req) ->
+  {Headers,_}= cowboy_req:headers(Req),
+  Headers.
+
+true_headers(Req) ->
+  [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
+
+ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],tab(Tab));
+ets({insert,Tab,K,V}) -> ets:insert(tab(Tab),{l2b(K),V});
+ets({insert,Tab,KVs}) -> ets:insert(tab(Tab),unpack(KVs));
+ets({counter,Tab,Key})-> update_counter(tab(Tab),l2b(Key));
+ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{l2b(Key),0}),"0";
+ets({get,Tab,Key})    -> getter(tab(Tab),l2b(Key));
+ets({delete,Tab,Key}) -> ets:delete(tab(Tab),l2b(Key)).
 
 getter(Tab,Key) ->
-  [{Key,Res}] = ets:lookup(Tab,Key),
-  case is_integer(Res) of
-    true -> integer_to_list(Res);
-    false-> Res
+  case ets:lookup(Tab,Key) of
+    [{Key,Res}] ->
+      case is_integer(Res) of
+        true -> integer_to_list(Res);
+        false-> Res
+      end;
+    [] ->
+      throw(no_such_key)
   end.
 
 update_counter(Tab,Key) ->
@@ -102,8 +129,12 @@ jd(Term) ->
 l2b(L) ->
   list_to_binary(L).
 
-l2ea(L) ->
-  list_to_existing_atom(L).
+tab(L) ->
+  T = list_to_existing_atom(L),
+  case ets:info(T,size) of
+    undefined -> throw(no_such_table);
+    _ -> T
+  end.
 
 gcall(What) ->
   gen_server:call(rets_tables,What).
@@ -111,8 +142,14 @@ gcall(What) ->
 je(Term) ->
   jiffy:encode(Term).
 
+flat(Term) ->
+  lists:flatten(io_lib:fwrite("~p",[Term])).
+
 %%%%%%%%%%
 %% eunit
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
 t00_test() ->
   start_rets(),
   ?assertEqual({200,"true"},
@@ -197,3 +234,4 @@ wait_for_start() ->
     _ ->
       ok
   end.
+-endif. % TEST

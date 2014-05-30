@@ -83,7 +83,7 @@ start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
 
 url(Host,Tab,Key) ->
-  "http://"++to_list(Host)++":8765/"++to_list(Tab)++"/"++to_list(Key).
+  "http://"++to_list(Host)++":7890/"++to_list(Tab)++"/"++to_list(Key).
 
 prep(PL = [{_,_}|_]) -> {[{prep(K),prep(V)}||{K,V}<-PL]};
 prep(L) when is_list(L) -> [prep(E)||E<-L];
