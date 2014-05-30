@@ -151,7 +151,7 @@ flat(Term) ->
 -include_lib("eunit/include/eunit.hrl").
 
 t00_test() ->
-  start_rets(),
+  restart_rets(),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
@@ -168,7 +168,7 @@ t00_test() ->
                rets_client:get(localhost,tibbe,ddd)).
 
 t01_test() ->
-  start_rets(),
+  restart_rets(),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
@@ -189,7 +189,7 @@ t01_test() ->
                rets_client:get(localhost,tibbe,ddd)).
 
 t02_test() ->
-  start_rets(),
+  restart_rets(),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
@@ -202,7 +202,7 @@ t02_test() ->
                rets_client:get(localhost,tibbe,ddd,[no_atoms])).
 
 t03_test() ->
-  start_rets(),
+  restart_rets(),
   ?assertEqual({200,"true"}, rets_client:put(localhost,tibbe)),
   ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)),
   ?assertEqual({200,2}, rets_client:put(localhost,tibbe,bbb,counter)),
@@ -210,13 +210,15 @@ t03_test() ->
   ?assertEqual({200,0}, rets_client:put(localhost,tibbe,bbb,reset)),
   ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)).
 
-start_rets() ->
+restart_rets() ->
   application:stop(rets),
+  application:stop(cowboy),
+  application:stop(ranch),
   start_and_wait().
 
 start_and_wait() ->
   receive after 200 -> ok end,
-  case application:start(rets) of
+  case start() of
     ok ->
       wait_for_start();
     _ ->
@@ -226,12 +228,11 @@ start_and_wait() ->
   end.
 
 wait_for_start() ->
-  case whereis(httpd_8765) of
-    undefined ->
-      erlang:display(waiting_for_startup),
+  case supervisor:which_children(ranch_sup) of
+    [{{_,rets_listener},_,_,[_]}|_] -> ok;
+    R ->
+      erlang:display({waiting_for_startup,R}),
       receive after 200 -> ok end,
-      wait_for_start();
-    _ ->
-      ok
+      wait_for_start()
   end.
 -endif. % TEST
