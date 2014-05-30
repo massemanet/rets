@@ -1,9 +1,48 @@
-commit 88573f10ac8dbfa138ca1ef3ebb31ef96f08cd0a
+commit a501e1f4d79e1bf7b3c0b0f1749ac59d1776ad4b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri May 30 15:57:37 2014 +0200
+
+    v0.4.9
+
+src/rets.app.src
+
+commit 8e5255a3b7dcf0f25ab7b89f9e8aecd97400a3ab
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri May 30 15:46:38 2014 +0200
+
+    make eunit work
+
+src/rets.erl
+src/rets_app.erl
+
+commit 018cd4ed0f5a5b19ef4e2fecceb4ac56842f53ca
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri May 30 14:14:47 2014 +0200
+
+    toss out inets, replace with cowboy
+
+rebar.config
+src/rets.app.src
+src/rets.erl
+src/rets_app.erl
+src/rets_client.erl
+src/rets_sup.erl
+
+commit eaa3fbdc6a861ae5ef3987217b5b79d737b74857
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Apr 14 15:53:44 2014 +0200
+
+    add more waiting in testcase
+
+src/rets.erl
+
+commit 5a9f995383277a2897d51094b7b9ac106f734349
 Author: mats cronqvist <masse@klarna.com>
 Date:   Wed Apr 9 11:59:39 2014 +0200
 
     v0.4.8
 
+ChangeLog
 src/rets.app.src
 
 commit 4e97bc052c1dfbe5a9c06c2e3f88dcd840daf613
