@@ -1,9 +1,26 @@
-commit a501e1f4d79e1bf7b3c0b0f1749ac59d1776ad4b
+commit e8ac4f5a235340bae3f1a14c67e1de5e34ec90f3
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jun 11 15:42:44 2014 +0200
+
+    v0.4.10
+
+src/rets.app.src
+
+commit 5901025abbc4d5ae91185ac2e456aae3327a7a41
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jun 11 15:42:25 2014 +0200
+
+    handle empty URL
+
+src/rets.erl
+
+commit 4de57a7edf18720a484e4b20e8c163bde5f71aa5
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri May 30 15:57:37 2014 +0200
 
     v0.4.9
 
+ChangeLog
 src/rets.app.src
 
 commit 8e5255a3b7dcf0f25ab7b89f9e8aecd97400a3ab
