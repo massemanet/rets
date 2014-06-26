@@ -1,9 +1,34 @@
-commit e8ac4f5a235340bae3f1a14c67e1de5e34ec90f3
+commit f60752f09b49d847c30f28e507a757913a98dd60
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Jun 26 11:15:47 2014 +0200
+
+    v0.4.11
+
+src/rets.app.src
+
+commit a3035232017ef2e085bb46238e58f88e5db09f02
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Jun 26 11:07:39 2014 +0200
+
+    cosmetic
+
+src/rets.erl
+
+commit 748e5a58551e0dbc08f311cdd57c32870ad25112
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Jun 26 11:06:31 2014 +0200
+
+    use application:ensure_all_started
+
+src/rets.erl
+
+commit 12912e25695a16a959c56934b164967a0c1f02b4
 Author: mats cronqvist <masse@klarna.com>
 Date:   Wed Jun 11 15:42:44 2014 +0200
 
     v0.4.10
 
+ChangeLog
 src/rets.app.src
 
 commit 5901025abbc4d5ae91185ac2e456aae3327a7a41
