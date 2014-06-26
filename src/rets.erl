@@ -19,11 +19,7 @@
 
 %% main application starter
 start() ->
-  application:start(ranch),
-  application:start(crypto),
-  application:start(cowlib),
-  application:start(cowboy),
-  application:start(rets).
+  application:ensure_all_started(rets).
 
 %% called from rets_app
 cowboy_opts() ->
@@ -210,6 +206,15 @@ t03_test() ->
   ?assertEqual({200,0}, rets_client:put(localhost,tibbe,bbb,reset)),
   ?assertEqual({200,1}, rets_client:put(localhost,tibbe,bbb,counter)).
 
+t04_test() ->
+  restart_rets(),
+  ?assertEqual({200,[]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,[tibbe]},
+               rets_client:get(localhost)).
+
 restart_rets() ->
   application:stop(rets),
   application:stop(cowboy),
@@ -219,7 +224,7 @@ restart_rets() ->
 start_and_wait() ->
   receive after 200 -> ok end,
   case start() of
-    ok ->
+    {ok,_} ->
       wait_for_start();
     _ ->
       erlang:display(waiting_for_shutdown),
