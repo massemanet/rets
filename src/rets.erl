@@ -261,11 +261,6 @@ t06_test() ->
   ?assertEqual({404,"fourohfour - no_such_table"},
                rets_client:get(localhost,tibbe)).
 
-t06_test() ->
-  restart_rets(),
-  ?assertEqual({404,"fourohfour - no_such_table"},
-               rets_client:get(localhost,tibbe)).
-
 restart_rets() ->
   application:stop(inets),
   application:stop(rets),
