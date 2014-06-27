@@ -82,7 +82,7 @@ expand_recs(Term) ->
 do_handle_call({all,[]},S) ->
   {S#state.tables,S};
 do_handle_call({create,Tab},S) ->
-  {true,assert_created(Tab,assert_deleted(Tab,S))};
+  {true,assert_created(Tab,S)};
 do_handle_call({delete,Tab},S) ->
   {true,assert_deleted(Tab,S)}.
 

@@ -39,13 +39,17 @@ terminate(_Reason, _Req, _State) ->
 %% called from cowboy. Req is the cowboy opaque state object.
 handle(Req,State) ->
   {ok,Req2} =
-    try          cow_reply(200,<<"application/json">>,reply(Req),Req)
-    catch _:R -> cow_reply(404,<<"text/plain">>,reply404(R),Req)
+    try
+      cow_reply(200,<<"application/json">>,reply(Req),Req)
+    catch
+      {Status,R} -> cow_reply(Status,<<"text/plain">>,reply(Status,R),Req);
+      C:R        -> cow_reply(500,<<"text/plain">>,reply(500,{C,R}),Req)
     end,
   {ok,Req2,State}.
 
-reply404(R) ->
-  "fourohfour - "++flat(R).
+reply(500,R) -> "fivehundred - "++flat({R,erlang:get_stacktrace()});
+reply(409,R) -> "fourohnine - "++flat(R);
+reply(404,R) -> "fourohfour - "++flat(R).
 
 cow_reply(Status,ContentType,Body,Req) ->
   cowboy_req:reply(Status,
@@ -65,7 +69,7 @@ reply(Req) ->
     {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
     {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
     {"DELETE",[Tab,Key],[]}          -> je(ets({delete,Tab,Key}));
-    _ -> throw({method(Req),uri(Req),headers(Req)})
+    X                                -> throw({404,X})
   end.
 
 body(Req) ->
@@ -92,12 +96,18 @@ true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],tab(Tab));
-ets({insert,Tab,K,V}) -> ets:insert(tab(Tab),{l2b(K),V});
+ets({insert,Tab,K,V}) -> inserter(tab(Tab),{l2b(K),V});
 ets({insert,Tab,KVs}) -> ets:insert(tab(Tab),unpack(KVs));
 ets({counter,Tab,Key})-> update_counter(tab(Tab),l2b(Key));
 ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{l2b(Key),0}),"0";
 ets({get,Tab,Key})    -> getter(tab(Tab),l2b(Key));
 ets({delete,Tab,Key}) -> ets:delete(tab(Tab),l2b(Key)).
+
+inserter(Tab,{K,V}) ->
+  case ets:insert_new(Tab,{K,V}) of
+    false-> throw({409,{exists,Tab,K}});
+    true -> true
+  end.
 
 getter(Tab,Key) ->
   case ets:lookup(Tab,Key) of
@@ -107,7 +117,7 @@ getter(Tab,Key) ->
         false-> Res
       end;
     [] ->
-      throw(no_such_key)
+      throw({404,no_such_key})
   end.
 
 update_counter(Tab,Key) ->
@@ -128,7 +138,7 @@ l2b(L) ->
 tab(L) ->
   T = list_to_existing_atom(L),
   case ets:info(T,size) of
-    undefined -> throw(no_such_table);
+    undefined -> throw({404,no_such_table});
     _ -> T
   end.
 
@@ -221,7 +231,43 @@ t04_test() ->
   ?assertEqual({200,[tibbe]},
                rets_client:get(localhost)).
 
+t05_test() ->
+  restart_rets(),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,17,foo)),
+  ?assertMatch({409,_},
+               rets_client:put(localhost,tibbe,17,a)).
+
+t06_test() ->
+  restart_rets(),
+  ?assertEqual({404,"fourohfour - no_such_table"},
+               rets_client:get(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({404,"fourohfour - no_such_key"},
+               rets_client:get(localhost,tibbe,17)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,17,foo)),
+  ?assertEqual({200,"true"},
+               rets_client:delete(localhost,tibbe,17)),
+  ?assertEqual({404,"fourohfour - no_such_key"},
+               rets_client:get(localhost,tibbe,17)),
+  ?assertEqual({200,"true"},
+               rets_client:delete(localhost,tibbe)),
+  ?assertEqual({404,"fourohfour - no_such_table"},
+               rets_client:get(localhost,tibbe,17)),
+  ?assertEqual({404,"fourohfour - no_such_table"},
+               rets_client:get(localhost,tibbe)).
+
+t06_test() ->
+  restart_rets(),
+  ?assertEqual({404,"fourohfour - no_such_table"},
+               rets_client:get(localhost,tibbe)).
+
 restart_rets() ->
+  application:stop(inets),
   application:stop(rets),
   application:stop(cowboy),
   application:stop(ranch),
