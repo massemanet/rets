@@ -1,9 +1,43 @@
-commit f60752f09b49d847c30f28e507a757913a98dd60
+commit d53de67f4d1c964d506a77f4e9d101ad65972cec
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jun 27 16:15:44 2014 +0200
+
+    v0.5.0
+
+src/rets.app.src
+
+commit 12d6bf5df6d530f561383c8aff26fe1213076291
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jun 27 16:14:47 2014 +0200
+
+    typo
+
+src/rets.erl
+
+commit 0288e82a30631318401f682861a20c121771b543
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jun 27 16:13:12 2014 +0200
+
+    changed semantics; inserts on existing key fail with a 409
+
+src/rets.erl
+src/rets_tables.erl
+
+commit c6f3b2bfb6cb4545f3dbbcb7e920c0eb2974ab22
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jun 27 16:11:41 2014 +0200
+
+    enable cover
+
+rebar.config
+
+commit 7d73b3f316c6ce2a45eb3a968b0fc816be0216e9
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Jun 26 11:15:47 2014 +0200
 
     v0.4.11
 
+ChangeLog
 src/rets.app.src
 
 commit a3035232017ef2e085bb46238e58f88e5db09f02
