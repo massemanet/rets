@@ -200,6 +200,8 @@ t00_test() ->
                                  {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
   ?assertEqual({200,"AAA"},
                rets_client:get(localhost,tibbe,'aaa/_/x')),
+  ?assertEqual({200,['aaa/1/x',bbb,ccc,ddd]},
+               rets_client:get(localhost,tibbe)),
   ?assertEqual({200,"AAA"},
                rets_client:get(localhost,tibbe,'_/1/_')),
   ?assertEqual({200,bBbB},
