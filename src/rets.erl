@@ -59,17 +59,17 @@ cow_reply(Status,ContentType,Body,Req) ->
 
 reply(Req) ->
   case {method(Req),uri(Req),true_headers(Req)} of
-    {"PUT",   [Tab,Key],["counter"]} -> ets({counter,Tab,Key});
-    {"PUT",   [Tab,Key],["reset"]}   -> ets({reset,Tab,Key});
-    {"PUT",   [Tab,Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
-    {"PUT",   [Tab]    ,[]}          -> je(gcall({create,Tab}));
-    {"GET",   [[]]     ,[]}          -> je([l2b(T)||T<-gcall({all,[]})]);
-    {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
-    {"GET",   [Tab,Key],[]}          -> ets({get,Tab,Key});
-    {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
-    {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
-    {"DELETE",[Tab,Key],[]}          -> je(ets({delete,Tab,Key}));
-    X                                -> throw({404,X})
+    {"PUT",   [Tab|KeyL],["counter"]} -> ets({counter,Tab,KeyL});
+    {"PUT",   [Tab|KeyL],["reset"]}   -> ets({reset,Tab,KeyL});
+    {"PUT",   [Tab|KeyL],[]}          -> je(ets({insert,Tab,KeyL,body(Req)}));
+    {"PUT",   [Tab]    ,[]}           -> je(gcall({create,Tab}));
+    {"GET",   [[]]     ,[]}           -> je([l2b(T)||T<-gcall({all,[]})]);
+    {"GET",   [Tab]    ,[]}           -> je(ets({keys,Tab}));
+    {"GET",   [Tab|KeyL],[]}          -> ets({get,Tab,KeyL});
+    {"POST",  [Tab]    ,[]}           -> je(ets({insert,Tab,body(Req)}));
+    {"DELETE",[Tab]    ,[]}           -> je(gcall({delete,Tab}));
+    {"DELETE",[Tab|KeyL],[]}          -> je(ets({delete,Tab,KeyL}));
+    X                                 -> throw({404,X})
   end.
 
 body(Req) ->
@@ -96,12 +96,12 @@ true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],tab(Tab));
-ets({insert,Tab,K,V}) -> inserter(tab(Tab),{l2b(K),V});
+ets({insert,Tab,K,V}) -> inserter(tab(Tab),{ikey(K),V});
 ets({insert,Tab,KVs}) -> ets:insert(tab(Tab),unpack(KVs));
-ets({counter,Tab,Key})-> update_counter(tab(Tab),l2b(Key));
-ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{l2b(Key),0}),"0";
-ets({get,Tab,Key})    -> getter(tab(Tab),l2b(Key));
-ets({delete,Tab,Key}) -> ets:delete(tab(Tab),l2b(Key)).
+ets({counter,Tab,Key})-> update_counter(tab(Tab),ikey(Key));
+ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
+ets({get,Tab,Key})    -> getter(tab(Tab),lkey(Key));
+ets({delete,Tab,Key}) -> ets:delete(tab(Tab),ikey(Key)).
 
 inserter(Tab,{K,V}) ->
   case ets:insert_new(Tab,{K,V}) of
@@ -110,8 +110,8 @@ inserter(Tab,{K,V}) ->
   end.
 
 getter(Tab,Key) ->
-  case ets:lookup(Tab,Key) of
-    [{Key,Res}] ->
+  case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
+    [{_,Res}] ->
       case is_integer(Res) of
         true -> integer_to_list(Res);
         false-> Res
@@ -132,9 +132,24 @@ unpack(KVs) ->
 jd(Term) ->
   jiffy:decode(Term).
 
+%% key for inserts/deletes
+ikey(L) ->
+  list_to_tuple([ielem(E) || E <- L]).
+
+ielem("_") -> throw({404,key_has_underscore});
+ielem(E)   -> l2b(E).
+
+%% key for lookups
+lkey(L) ->
+  list_to_tuple([lelem(E) || E <- L]).
+
+lelem("_") -> '_';
+lelem(E)   -> l2b(E).
+
 l2b(L) ->
   list_to_binary(L).
 
+%% table names
 tab(L) ->
   T = list_to_existing_atom(L),
   case ets:info(T,size) of
