@@ -95,8 +95,8 @@ headers(Req) ->
 true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
-ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],tab(Tab));
-ets({insert,Tab,K,V}) -> inserter(tab(Tab),{ikey(K),V});
+ets({keys,Tab})       -> key_getter(tab(Tab));
+ets({insert,Tab,K,V}) -> inserter(tab(Tab),{K,V});
 ets({insert,Tab,KVs}) -> multi_inserter(tab(Tab),KVs);
 ets({counter,Tab,Key})-> update_counter(tab(Tab),ikey(Key));
 ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
@@ -107,11 +107,15 @@ multi_inserter(Tab,KVs) ->
   {PL} = jd(KVs),
   ets:insert_new(Tab,[{ikey(binary_to_elems(K)),je(V)} || {K,V} <- PL]).
 
-inserter(Tab,{K,V}) ->
+inserter(Tab,{Ks,V}) ->
+  K = ikey(Ks),
   case ets:insert_new(Tab,{K,V}) of
     false-> throw({409,{exists,Tab,K}});
     true -> true
   end.
+
+key_getter(Tab) ->
+  ets:foldr(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Tab).
 
 getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
@@ -146,6 +150,14 @@ lkey(L) ->
 lelem("_") -> '_';
 lelem(E)   -> l2b(E).
 
+%% exporting keys
+elems_to_binary(T) ->
+  list_to_binary(join(tuple_to_list(T),<<"/">>)).
+
+join([E],_) -> [E];
+join([E|R],D) -> [E,D|join(R,D)].
+
+%% importing keys
 binary_to_elems(B) ->
   string:tokens(binary_to_list(B),"/").
 
@@ -154,10 +166,12 @@ l2b(L) ->
 
 %% table names
 tab(L) ->
-  T = list_to_existing_atom(L),
-  case ets:info(T,size) of
-    undefined -> throw({404,no_such_table});
-    _ -> T
+  try
+    T = list_to_existing_atom(L),
+    true = is_integer(ets:info(T,size)),
+    T
+  catch
+    _:_ -> throw({404,no_such_table})
   end.
 
 gcall(What) ->
@@ -200,7 +214,7 @@ t01_test() ->
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
-               rets_client:put(localhost,tibbe,aaa,"AAA")),
+               rets_client:put(localhost,tibbe,'aaa/1/x',"AAA")),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe,bbb,bBbB)),
   ?assertEqual({200,"true"},
@@ -208,7 +222,11 @@ t01_test() ->
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,aaa)),
+               rets_client:get(localhost,tibbe,'aaa/_/x')),
+  ?assertEqual({200,"AAA"},
+               rets_client:get(localhost,tibbe,'_/1/_')),
+  ?assertEqual({200,"AAA"},
+               rets_client:get(localhost,tibbe,'aaa/1/x')),
   ?assertEqual({200,bBbB},
                rets_client:get(localhost,tibbe,bbb)),
   ?assertEqual({200,123.1},
