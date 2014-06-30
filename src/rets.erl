@@ -59,15 +59,15 @@ cow_reply(Status,ContentType,Body,Req) ->
 
 reply(Req) ->
   case {method(Req),uri(Req),true_headers(Req)} of
+    {"PUT",   [Tab]     ,[]}          -> je(gcall({create,Tab}));
+    {"PUT",   [Tab|KeyL],[]}          -> je(ets({insert,Tab,KeyL,body(Req)}));
     {"PUT",   [Tab|KeyL],["counter"]} -> ets({counter,Tab,KeyL});
     {"PUT",   [Tab|KeyL],["reset"]}   -> ets({reset,Tab,KeyL});
-    {"PUT",   [Tab|KeyL],[]}          -> je(ets({insert,Tab,KeyL,body(Req)}));
-    {"PUT",   [Tab]    ,[]}           -> je(gcall({create,Tab}));
-    {"GET",   [[]]     ,[]}           -> je([l2b(T)||T<-gcall({all,[]})]);
-    {"GET",   [Tab]    ,[]}           -> je(ets({keys,Tab}));
+    {"GET",   [[]]      ,[]}          -> je([l2b(T)||T<-gcall({all,[]})]);
+    {"GET",   [Tab]     ,[]}          -> je(ets({keys,Tab}));
     {"GET",   [Tab|KeyL],[]}          -> ets({get,Tab,KeyL});
-    {"POST",  [Tab]    ,[]}           -> je(ets({insert,Tab,body(Req)}));
-    {"DELETE",[Tab]    ,[]}           -> je(gcall({delete,Tab}));
+    {"POST",  [Tab]     ,[]}          -> je(ets({insert,Tab,body(Req)}));
+    {"DELETE",[Tab]     ,[]}          -> je(gcall({delete,Tab}));
     {"DELETE",[Tab|KeyL],[]}          -> je(ets({delete,Tab,KeyL}));
     X                                 -> throw({404,X})
   end.
@@ -97,11 +97,15 @@ true_headers(Req) ->
 
 ets({keys,Tab})       -> ets:foldr(fun({K,_},A)->[K|A]end,[],tab(Tab));
 ets({insert,Tab,K,V}) -> inserter(tab(Tab),{ikey(K),V});
-ets({insert,Tab,KVs}) -> ets:insert(tab(Tab),unpack(KVs));
+ets({insert,Tab,KVs}) -> multi_inserter(tab(Tab),KVs);
 ets({counter,Tab,Key})-> update_counter(tab(Tab),ikey(Key));
 ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
 ets({get,Tab,Key})    -> getter(tab(Tab),lkey(Key));
 ets({delete,Tab,Key}) -> ets:delete(tab(Tab),ikey(Key)).
+
+multi_inserter(Tab,KVs) ->
+  {PL} = jd(KVs),
+  ets:insert_new(Tab,[{ikey(binary_to_elems(K)),je(V)} || {K,V} <- PL]).
 
 inserter(Tab,{K,V}) ->
   case ets:insert_new(Tab,{K,V}) of
@@ -125,10 +129,6 @@ update_counter(Tab,Key) ->
   catch _:_ -> ets:insert(Tab,{Key,1}),"1"
   end.
 
-unpack(KVs) ->
-  {PL} = jd(KVs),
-  [{K,je(V)} || {K,V} <- PL].
-
 jd(Term) ->
   jiffy:decode(Term).
 
@@ -145,6 +145,9 @@ lkey(L) ->
 
 lelem("_") -> '_';
 lelem(E)   -> l2b(E).
+
+binary_to_elems(B) ->
+  string:tokens(binary_to_list(B),"/").
 
 l2b(L) ->
   list_to_binary(L).
@@ -177,10 +180,14 @@ t00_test() ->
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
                rets_client:post(localhost,tibbe,
-                                [{aaa,"AAA"},{bbb,bBbB},{ccc,123.1},
+                                [{'aaa/1/x',"AAA"},
+                                 {bbb,bBbB},
+                                 {ccc,123.1},
                                  {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,aaa)),
+               rets_client:get(localhost,tibbe,'aaa/_/x')),
+  ?assertEqual({200,"AAA"},
+               rets_client:get(localhost,tibbe,'_/1/_')),
   ?assertEqual({200,bBbB},
                rets_client:get(localhost,tibbe,bbb)),
   ?assertEqual({200,123.1},
