@@ -1,9 +1,75 @@
-commit d53de67f4d1c964d506a77f4e9d101ad65972cec
+commit b8e094f8c8062b0b4bfd9c4abe6236f0421611be
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jul 1 14:08:57 2014 +0200
+
+    v0.6.0
+
+src/rets.app.src
+
+commit c5099c2305a79abe65bb766b3f63926e84f103c6
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jul 1 14:05:15 2014 +0200
+
+    implement the multi option
+
+src/rets.erl
+src/rets_client.erl
+
+commit 43dd6b151ddb68b95efe967950986eee2589bd4c
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Jul 1 14:04:28 2014 +0200
+
+    cosmetic
+
+src/rets.erl
+
+commit 7cd068cbb6c77f3373e7c6f7b2fc9073691eeb4e
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jun 30 17:05:41 2014 +0200
+
+    tests
+
+src/rets.erl
+
+commit 8a0af244b65f07d1ff41878375e97d2adaa9d259
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jun 30 16:57:47 2014 +0200
+
+    test
+
+src/rets.erl
+
+commit 7fc808de9b61bcd7a5e218e35e1c42230a5c1fd0
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jun 30 16:55:42 2014 +0200
+
+    fix GET keys
+
+src/rets.erl
+
+commit 2dd92d9244789369f7525629c2a1ba624f6946a6
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jun 30 16:03:19 2014 +0200
+
+    fix post functionality
+
+src/rets.erl
+
+commit b3d19a416f3029701f229c48429ad5f94c127865
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Jun 30 15:23:49 2014 +0200
+
+    use select instead of lookup
+
+src/rets.erl
+
+commit 343d8dd4d01c38a06f9040e1498755507ed4454d
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Jun 27 16:15:44 2014 +0200
 
     v0.5.0
 
+ChangeLog
 src/rets.app.src
 
 commit 12d6bf5df6d530f561383c8aff26fe1213076291
