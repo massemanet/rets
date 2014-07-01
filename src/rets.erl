@@ -47,9 +47,9 @@ handle(Req,State) ->
     end,
   {ok,Req2,State}.
 
-reply(500,R) -> "fivehundred - "++flat({R,erlang:get_stacktrace()});
-reply(409,R) -> "fourohnine - "++flat(R);
-reply(404,R) -> "fourohfour - "++flat(R).
+reply(500,R) -> flat({R,erlang:get_stacktrace()});
+reply(409,R) -> flat(R);
+reply(404,R) -> flat(R).
 
 cow_reply(Status,ContentType,Body,Req) ->
   cowboy_req:reply(Status,
@@ -284,23 +284,23 @@ t05_test() ->
 
 t06_test() ->
   restart_rets(),
-  ?assertEqual({404,"fourohfour - no_such_table"},
+  ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
-  ?assertEqual({404,"fourohfour - no_such_key"},
+  ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe,17,foo)),
   ?assertEqual({200,"true"},
                rets_client:delete(localhost,tibbe,17)),
-  ?assertEqual({404,"fourohfour - no_such_key"},
+  ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({200,"true"},
                rets_client:delete(localhost,tibbe)),
-  ?assertEqual({404,"fourohfour - no_such_table"},
+  ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe,17)),
-  ?assertEqual({404,"fourohfour - no_such_table"},
+  ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)).
 
 restart_rets() ->
