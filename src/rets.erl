@@ -66,6 +66,7 @@ reply(Req) ->
     {"GET",   [[]]      ,[]}          -> je([l2b(T)||T<-gcall({all,[]})]);
     {"GET",   [Tab]     ,[]}          -> je(ets({keys,Tab}));
     {"GET",   [Tab|KeyL],[]}          -> ets({get,Tab,KeyL});
+    {"GET",   [Tab|KeyL],["multi"]}   -> je(ets({multi_get,Tab,KeyL}));
     {"POST",  [Tab]     ,[]}          -> je(ets({insert,Tab,body(Req)}));
     {"DELETE",[Tab]     ,[]}          -> je(gcall({delete,Tab}));
     {"DELETE",[Tab|KeyL],[]}          -> je(ets({delete,Tab,KeyL}));
@@ -95,13 +96,14 @@ headers(Req) ->
 true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
-ets({keys,Tab})       -> key_getter(tab(Tab));
-ets({insert,Tab,K,V}) -> inserter(tab(Tab),{K,V});
-ets({insert,Tab,KVs}) -> multi_inserter(tab(Tab),KVs);
-ets({counter,Tab,Key})-> update_counter(tab(Tab),ikey(Key));
-ets({reset,Tab,Key})  -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
-ets({get,Tab,Key})    -> getter(tab(Tab),lkey(Key));
-ets({delete,Tab,Key}) -> ets:delete(tab(Tab),ikey(Key)).
+ets({keys,Tab})          -> key_getter(tab(Tab));
+ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
+ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
+ets({counter,Tab,Key})   -> update_counter(tab(Tab),ikey(Key));
+ets({reset,Tab,Key})     -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
+ets({get,Tab,Key})       -> getter(tab(Tab),lkey(Key));
+ets({multi_get,Tab,Key}) -> multi_getter(tab(Tab),lkey(Key));
+ets({delete,Tab,Key})    -> ets:delete(tab(Tab),ikey(Key)).
 
 multi_inserter(Tab,KVs) ->
   {PL} = jd(KVs),
@@ -119,13 +121,18 @@ key_getter(Tab) ->
 
 getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
-    [{_,Res}] ->
-      case is_integer(Res) of
-        true -> integer_to_list(Res);
-        false-> Res
-      end;
-    [] ->
-      throw({404,no_such_key})
+    [{_,Res}] -> maybe_counter(Res);
+    []        -> throw({404,no_such_key});
+    _         -> throw({404,multiple_hits})
+  end.
+
+maybe_counter(E) when is_integer(E) -> integer_to_list(E);
+maybe_counter(E) -> E.
+
+multi_getter(Tab,Key) ->
+  case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
+    []   -> throw({404,no_such_key});
+    Hits -> lists:foldl(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Hits)
   end.
 
 update_counter(Tab,Key) ->
@@ -302,6 +309,38 @@ t06_test() ->
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)).
+
+t07_test() ->
+  restart_rets(),
+  ?assertEqual({404,"no_such_table"},
+               rets_client:get(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,[tibbe]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,[]},
+               rets_client:get(localhost,tibbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,'a/2/x',segundo)),
+  ?assertEqual({200,segundo},
+               rets_client:get(localhost,tibbe,'a/_/_')),
+  ?assertEqual({404,"key_has_underscore"},
+               rets_client:put(localhost,tibbe,'a/_/_',s)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,'a/1/x',primo)),
+  ?assertEqual({404,"no_such_key"},
+                rets_client:get(localhost,tibbe,'a')),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tibbe,'a',1)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tibbe,'a')),
+  ?assertEqual({404,"multiple_hits"},
+               rets_client:get(localhost,tibbe,'a/_/_')),
+  ?assertEqual({200,['a/2/x','a/1/x']},
+               rets_client:get(localhost,tibbe,'a/_/_',[multi])),
+  ?assertEqual({404,"no_such_key"},
+               rets_client:get(localhost,tibbe,'b/_/_',[multi])).
+
 
 restart_rets() ->
   application:stop(inets),

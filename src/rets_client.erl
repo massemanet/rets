@@ -18,8 +18,10 @@ get(Host,Tab) ->
   get(Host,Tab,"").
 get(Host,Tab,Key) ->
   get(Host,Tab,Key,[]).
+get(Host,Tab,Key,Opt) when is_atom(Opt) ->
+  get(Host,Tab,Key,[Opt]);
 get(Host,Tab,Key,Opts) ->
-  case httpc_request(get,Host,Tab,Key,[]) of
+  case httpc_request(get,Host,Tab,Key,get_opts(Opts)) of
     {200,Reply} ->
       case dec(Reply) of
         {PL} -> {200,maybe_atomize(PL,Opts)};
@@ -52,6 +54,13 @@ trace(Host,Headers) ->
   httpc_request(trace,Host,"","",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_opts([]) -> [];
+get_opts(Opts) ->
+  case lists:member(multi,Opts) of
+    true -> [{"multi","true"}];
+    false-> []
+end.
+
 put_counter(Host,Tab,Key,Header) ->
   case httpc_request(put,Host,Tab,Key,[{Header,"true"}],[]) of
     {200,Reply} -> {200,list_to_integer(Reply)};
