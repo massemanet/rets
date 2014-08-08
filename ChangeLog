@@ -1,9 +1,51 @@
-commit b8e094f8c8062b0b4bfd9c4abe6236f0421611be
+commit 98b38c5b5ccba9a95c5ddec70af8d413c237738f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Aug 8 12:00:19 2014 +0200
+
+    v0.6.1
+
+src/rets.app.src
+
+commit f503ab2e65b37e5c62ef9b9331f3949ca11bafe8
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Aug 8 11:59:05 2014 +0200
+
+    fix handling of wrapped proplists
+
+src/rets_client.erl
+
+commit d64e071cfedfd943c17cb915421554f372e72d6a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Aug 8 11:50:09 2014 +0200
+
+    minor refactor
+
+src/rets_client.erl
+
+commit 72044c02a51cdd69152644c6fe675fa5683c0469
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Aug 8 11:37:40 2014 +0200
+
+    test
+
+Makefile
+src/rets.erl
+
+commit 6c58f7cd6b79cbac502d785b90aa2f175910c5f4
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Aug 8 11:26:54 2014 +0200
+
+    cosmetic
+
+rebar.config
+
+commit 4849e1bc3e23a336c1049e928a8c68ddb6c6aaca
 Author: mats cronqvist <masse@klarna.com>
 Date:   Tue Jul 1 14:08:57 2014 +0200
 
     v0.6.0
 
+ChangeLog
 src/rets.app.src
 
 commit c5099c2305a79abe65bb766b3f63926e84f103c6
