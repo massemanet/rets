@@ -1,6 +1,6 @@
 REBAR = ./rebar
 
-.PHONY: all clean deps eunit xref release release_minor release_major
+.PHONY: all clean deps test eunit xref release release_minor release_major
 
 all:
 	@$(REBAR) compile
@@ -8,6 +8,8 @@ all:
 clean:
 	@find . -name "*~" -exec rm {} \;
 	@$(REBAR) clean
+
+test: eunit xref
 
 eunit:
 	@$(REBAR) eunit skip_deps=true

@@ -341,6 +341,15 @@ t07_test() ->
   ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,'b/_/_',[multi])).
 
+t08_test() ->
+  T = [{a,a},{b,[{bb,bb}]}], %% nested proplist
+  restart_rets(),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tybbe)),
+  ?assertEqual({200,"true"},
+               rets_client:put(localhost,tybbe,"abc",T)),
+  ?assertMatch({200,T},
+               rets_client:get(localhost,tybbe,"abc")).
 
 restart_rets() ->
   application:stop(inets),
