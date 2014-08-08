@@ -43,10 +43,10 @@ put(Host,Tab,Key,counter) ->
 put(Host,Tab,Key,reset) ->
   put_counter(Host,Tab,Key,"reset");
 put(Host,Tab,Key,PL) ->
-  httpc_request(put,Host,Tab,Key,[],PL).
+  httpc_request(put,Host,Tab,Key,[],enc(prep(PL))).
 
 post(Host,Tab,PL) ->
-  httpc_request(post,Host,Tab,"",[],PL).
+  httpc_request(post,Host,Tab,"",[],enc(prep(PL))).
 
 trace(Host) ->
   trace(Host,[]).
@@ -67,26 +67,21 @@ put_counter(Host,Tab,Key,Header) ->
     {Status,Reply} -> {Status,Reply}
   end.
 
-httpc_request(M,Host,Tab,Key,Headers) when M==trace;M==get;M==delete ->
-  httpc_request(fun() -> httpc_request(M,url(Host,Tab,Key),Headers) end).
-
-httpc_request(M,Host,Tab,Key,Headers,PL) when M==post;M==put ->
-  httpc_request(fun() -> httpc_request(M,url(Host,Tab,Key),Headers,PL) end).
-
-httpc_request(HTTPCreq) ->
+httpc_request(M,Host,Tab,Key,Headers) ->
+  httpc_request(M,Host,Tab,Key,Headers,[]).
+httpc_request(M,Host,Tab,Key,Headers,PL) ->
   start_app(inets),
-  case HTTPCreq() of
+  case httpc_request(M,url(Host,Tab,Key),Headers,PL) of
     {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
       {Status,Reply};
     Error->
       Error
   end.
 
-httpc_request(M,URL,Headers) ->
-  httpc:request(M,{URL,Headers},[],[]).
-
-httpc_request(M,URL,Headers,PL) ->
-  httpc:request(M,{URL,Headers,[],enc(prep(PL))},[],[]).
+httpc_request(M,URL,Headers,[]) when M==trace; M==get; M==delete ->
+  httpc:request(M,{URL,Headers},[],[]);
+httpc_request(M,URL,Headers,PL) when M==post; M==put ->
+  httpc:request(M,{URL,Headers,[],PL},[],[]).
 
 start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
