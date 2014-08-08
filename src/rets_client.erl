@@ -23,10 +23,7 @@ get(Host,Tab,Key,Opt) when is_atom(Opt) ->
 get(Host,Tab,Key,Opts) ->
   case httpc_request(get,Host,Tab,Key,get_opts(Opts)) of
     {200,Reply} ->
-      case dec(Reply) of
-        {PL} -> {200,maybe_atomize(PL,Opts)};
-        X    -> {200,maybe_atomize(X,Opts)}
-      end;
+      {200,maybe_atomize(unprep(dec(Reply)),Opts)};
     Error ->
       Error
   end.
@@ -89,6 +86,13 @@ start_app(M) ->
 url(Host,Tab,Key) ->
   "http://"++to_list(Host)++":7890/"++to_list(Tab)++"/"++to_list(Key).
 
+%% unwrap proplists from {} from jiffy
+unprep({PL} = {[{_,_}|_]}) -> [{unprep(K),unprep(V)}||{K,V}<-PL];
+unprep(L) when is_list(L) -> [unprep(E)||E<-L];
+unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
+unprep(X) -> X.
+
+%% wrap proplists in {} for jiffy
 prep(PL = [{_,_}|_]) -> {[{prep(K),prep(V)}||{K,V}<-PL]};
 prep(L) when is_list(L) -> [prep(E)||E<-L];
 prep(T) when is_tuple(T) -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]);
