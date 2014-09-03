@@ -63,7 +63,7 @@ reply(Req) ->
     {"PUT",   [Tab|KeyL],[]}          -> je(ets({insert,Tab,KeyL,body(Req)}));
     {"PUT",   [Tab|KeyL],["counter"]} -> ets({counter,Tab,KeyL});
     {"PUT",   [Tab|KeyL],["reset"]}   -> ets({reset,Tab,KeyL});
-    {"GET",   [[]]      ,[]}          -> je([l2b(T)||T<-gcall({all,[]})]);
+    {"GET",   [[]]      ,[]}          -> je(ets({sizes,gcall({all,[]})}));
     {"GET",   [Tab]     ,[]}          -> je(ets({keys,Tab}));
     {"GET",   [Tab|KeyL],[]}          -> ets({get,Tab,KeyL});
     {"GET",   [Tab|KeyL],["multi"]}   -> je(ets({multi_get,Tab,KeyL}));
@@ -96,6 +96,7 @@ headers(Req) ->
 true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
+ets({sizes,Tabs})        -> size_getter([tab(T) || T <- Tabs]);
 ets({keys,Tab})          -> key_getter(tab(Tab));
 ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
 ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
@@ -115,6 +116,11 @@ inserter(Tab,{Ks,V}) ->
     false-> throw({409,{exists,Tab,K}});
     true -> true
   end.
+
+size_getter([]) ->
+  [];
+size_getter(Tabs) ->
+  {[{T,ets:info(T,size)} || T <- Tabs]}.
 
 key_getter(Tab) ->
   ets:foldr(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Tab).
@@ -159,7 +165,7 @@ lelem(E)   -> l2b(E).
 
 %% exporting keys
 elems_to_binary(T) ->
-  list_to_binary(join(tuple_to_list(T),<<"/">>)).
+  l2b(join(tuple_to_list(T),<<"/">>)).
 
 join([E],_) -> [E];
 join([E|R],D) -> [E,D|join(R,D)].
@@ -277,7 +283,7 @@ t04_test() ->
                rets_client:get(localhost)),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,[tibbe]},
+  ?assertEqual({200,[{tibbe,0}]},
                rets_client:get(localhost)).
 
 t05_test() ->
@@ -286,6 +292,8 @@ t05_test() ->
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe,17,foo)),
+  ?assertEqual({200,[{tibbe,1}]},
+               rets_client:get(localhost)),
   ?assertMatch({409,_},
                rets_client:put(localhost,tibbe,17,a)).
 
@@ -316,7 +324,7 @@ t07_test() ->
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,"true"},
                rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,[tibbe]},
+  ?assertEqual({200,[{tibbe,0}]},
                rets_client:get(localhost)),
   ?assertEqual({200,[]},
                rets_client:get(localhost,tibbe)),
