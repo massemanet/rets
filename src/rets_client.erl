@@ -17,15 +17,19 @@ get(Host) ->
 get(Host,Tab) ->
   get(Host,Tab,"").
 get(Host,Tab,Key) ->
-  get(Host,Tab,Key,[]).
-get(Host,Tab,Key,Opt) when is_atom(Opt) ->
-  get(Host,Tab,Key,[Opt]);
-get(Host,Tab,Key,Opts) ->
-  case httpc_request(get,Host,Tab,Key,get_opts(Opts)) of
-    {200,Reply} ->
-      {200,maybe_atomize(unprep(dec(Reply)),Opts)};
-    Error ->
-      Error
+  get(Host,Tab,Key,[],[]).
+get(Host,Tab,Key,next) ->
+  get(Host,Tab,Key,[{"next","true"}],[]);
+get(Host,Tab,Key,prev) ->
+  get(Host,Tab,Key,[{"prev","true"}],[]);
+get(Host,Tab,Key,multi) ->
+  get(Host,Tab,Key,[{"multi","true"}],[]).
+
+%% internal
+get(Host,Tab,Key,Headers,Opts) ->
+  case httpc_request(get,Host,Tab,Key,Headers) of
+    {200,Reply} -> {200,maybe_atomize(unprep(dec(Reply)),Opts)};
+    Error       -> Error
   end.
 
 delete(Host,Tab) ->
@@ -36,11 +40,18 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  put_counter(Host,Tab,Key,"counter");
+  put(Host,Tab,Key,[{"counter","true"}],[],[integerize]);
 put(Host,Tab,Key,reset) ->
-  put_counter(Host,Tab,Key,"reset");
+  put(Host,Tab,Key,[{"reset","true"}],[],[integerize]);
 put(Host,Tab,Key,PL) ->
-  httpc_request(put,Host,Tab,Key,[],enc(prep(PL))).
+  put(Host,Tab,Key,[],PL,[]).
+
+%% internal
+put(Host,Tab,Key,Headers,PL,Opts) ->
+  case httpc_request(put,Host,Tab,Key,Headers,enc(prep(PL))) of
+    {200,Reply} -> {200,maybe_integerize(Reply,Opts)};
+    Error       -> Error
+  end.
 
 post(Host,Tab,PL) ->
   httpc_request(post,Host,Tab,"",[],enc(prep(PL))).
@@ -51,18 +62,6 @@ trace(Host,Headers) ->
   httpc_request(trace,Host,"","",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_opts([]) -> [];
-get_opts(Opts) ->
-  case lists:member(multi,Opts) of
-    true -> [{"multi","true"}];
-    false-> []
-end.
-
-put_counter(Host,Tab,Key,Header) ->
-  case httpc_request(put,Host,Tab,Key,[{Header,"true"}],[]) of
-    {200,Reply} -> {200,list_to_integer(Reply)};
-    {Status,Reply} -> {Status,Reply}
-  end.
 
 httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
@@ -102,6 +101,12 @@ to_list(X) when is_binary(X) -> binary_to_list(X);
 to_list(X) when is_list(X)   -> X;
 to_list(X) when is_integer(X)-> integer_to_list(X);
 to_list(X) when is_atom(X)   -> atom_to_list(X).
+
+maybe_integerize(Term,Opts) ->
+  case lists:member(integerize,Opts) of
+    true -> list_to_integer(Term);
+    false-> Term
+  end.
 
 maybe_atomize(Term,Opts) ->
   case lists:member(no_atoms,Opts) of

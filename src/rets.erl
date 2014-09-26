@@ -59,18 +59,20 @@ cow_reply(Status,ContentType,Body,Req) ->
 
 reply(Req) ->
   case {method(Req),uri(Req),true_headers(Req)} of
-    {"PUT",   [Tab]     ,[]}          -> je(gcall({create,Tab}));
-    {"PUT",   [Tab|KeyL],[]}          -> je(ets({insert,Tab,KeyL,body(Req)}));
-    {"PUT",   [Tab|KeyL],["counter"]} -> ets({counter,Tab,KeyL});
-    {"PUT",   [Tab|KeyL],["reset"]}   -> ets({reset,Tab,KeyL});
-    {"GET",   [[]]      ,[]}          -> je(ets({sizes,gcall({all,[]})}));
-    {"GET",   [Tab]     ,[]}          -> je(ets({keys,Tab}));
-    {"GET",   [Tab|KeyL],[]}          -> ets({get,Tab,KeyL});
-    {"GET",   [Tab|KeyL],["multi"]}   -> je(ets({multi_get,Tab,KeyL}));
-    {"POST",  [Tab]     ,[]}          -> je(ets({insert,Tab,body(Req)}));
-    {"DELETE",[Tab]     ,[]}          -> je(gcall({delete,Tab}));
-    {"DELETE",[Tab|KeyL],[]}          -> je(ets({delete,Tab,KeyL}));
-    X                                 -> throw({404,X})
+    {"PUT",   [Tab]    ,[]}          -> je(gcall({create,Tab}));
+    {"PUT",   [Tab|Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
+    {"PUT",   [Tab|Key],["counter"]} -> ets({counter,Tab,Key});
+    {"PUT",   [Tab|Key],["reset"]}   -> ets({reset,Tab,Key});
+    {"GET",   [[]]     ,[]}          -> je(ets({sizes,gcall({all,[]})}));
+    {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
+    {"GET",   [Tab|Key],[]}          -> ets({get,Tab,Key});
+    {"GET",   [Tab|Key],["next"]}    -> je(ets({next,Tab,Key}));
+    {"GET",   [Tab|Key],["prev"]}    -> je(ets({prev,Tab,Key}));
+    {"GET",   [Tab|Key],["multi"]}   -> je(ets({multi_get,Tab,Key}));
+    {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
+    {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
+    {"DELETE",[Tab|Key],[]}          -> je(ets({delete,Tab,Key}));
+    X                                -> throw({404,X})
   end.
 
 body(Req) ->
@@ -102,6 +104,8 @@ ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
 ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
 ets({counter,Tab,Key})   -> update_counter(tab(Tab),ikey(Key));
 ets({reset,Tab,Key})     -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
+ets({next,Tab,Key})      -> next(tab(Tab),ikey(Key));
+ets({prev,Tab,Key})      -> prev(tab(Tab),ikey(Key));
 ets({get,Tab,Key})       -> getter(tab(Tab),lkey(Key));
 ets({multi_get,Tab,Key}) -> multi_getter(tab(Tab),lkey(Key));
 ets({delete,Tab,Key})    -> ets:delete(tab(Tab),ikey(Key)).
@@ -117,13 +121,17 @@ inserter(Tab,{Ks,V}) ->
     true -> true
   end.
 
-size_getter([]) ->
-  [];
-size_getter(Tabs) ->
-  {[{T,ets:info(T,size)} || T <- Tabs]}.
+size_getter([])   -> [];
+size_getter(Tabs) -> {[{T,ets:info(T,size)} || T <- Tabs]}.
 
 key_getter(Tab) ->
   ets:foldr(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Tab).
+
+next(Tab,Key) ->
+  ets:lookup(Tab,ets:next(Tab,Key)).
+
+prev(Tab,Key) ->
+  ets:prev(Tab,Key).
 
 getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
