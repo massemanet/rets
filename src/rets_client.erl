@@ -28,7 +28,7 @@ get(Host,Tab,Key,multi) ->
 %% internal
 get(Host,Tab,Key,Headers,Opts) ->
   case httpc_request(get,Host,Tab,Key,Headers) of
-    {200,Reply} -> {200,maybe_atomize(unprep(dec(Reply)),Opts)};
+    {200,Reply} -> {200,maybe_atomize(unprep(dec(Reply)),[no_atoms|Opts])};
     Error       -> Error
   end.
 
