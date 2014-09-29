@@ -92,10 +92,18 @@ unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
 unprep(X) -> X.
 
 %% wrap proplists in {} for jiffy
-prep(PL = [{_,_}|_]) -> {[{prep(K),prep(V)}||{K,V}<-PL]};
-prep(L) when is_list(L) -> [prep(E)||E<-L];
-prep(T) when is_tuple(T) -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]);
-prep(X) -> X.
+-define(is_string(S), S=="";is_integer(hd(S))).
+prep(true)                 -> true;
+prep(false)                -> false;
+prep(null)                 -> null;
+prep(X) when is_binary(X)  -> X;
+prep(X) when is_number(X)  -> X;
+prep(X) when is_atom(X)    -> list_to_binary(atom_to_list(X));
+prep(X) when ?is_string(X) -> list_to_binary(X);
+prep(PL = [{_,_}|_])       -> {[{prep(K),prep(V)}||{K,V}<-PL]};
+prep(L) when is_list(L)    -> [prep(E)||E<-L];
+prep(T) when is_tuple(T)   -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]).
+
 
 to_list(X) when is_binary(X) -> binary_to_list(X);
 to_list(X) when is_list(X)   -> X;
