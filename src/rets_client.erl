@@ -13,7 +13,7 @@
          trace/1,trace/2]).
 
 get(Host) ->
-  get(Host,"").
+  atomize(get(Host,"")).
 get(Host,Tab) ->
   get(Host,Tab,"").
 get(Host,Tab,Key) ->
@@ -26,11 +26,8 @@ get(Host,Tab,Key,multi) ->
   get(Host,Tab,Key,[{"multi","true"}],[]).
 
 %% internal
-get(Host,Tab,Key,Headers,Opts) ->
-  case httpc_request(get,Host,Tab,Key,Headers) of
-    {200,Reply} -> {200,maybe_atomize(unprep(dec(Reply)),[no_atoms|Opts])};
-    Error       -> Error
-  end.
+get(Host,Tab,Key,Headers,[]) ->
+  httpc_request(get,Host,Tab,Key,Headers).
 
 delete(Host,Tab) ->
   delete(Host,Tab,"").
@@ -40,21 +37,18 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  put(Host,Tab,Key,[{"counter","true"}],[],[integerize]);
+  put(Host,Tab,Key,[{"counter","true"}],[],[]);
 put(Host,Tab,Key,reset) ->
-  put(Host,Tab,Key,[{"reset","true"}],[],[integerize]);
+  put(Host,Tab,Key,[{"reset","true"}],[],[]);
 put(Host,Tab,Key,PL) ->
   put(Host,Tab,Key,[],PL,[]).
 
 %% internal
-put(Host,Tab,Key,Headers,PL,Opts) ->
-  case httpc_request(put,Host,Tab,Key,Headers,enc(prep(PL))) of
-    {200,Reply} -> {200,maybe_integerize(Reply,Opts)};
-    Error       -> Error
-  end.
+put(Host,Tab,Key,Headers,PL,[]) ->
+  httpc_request(put,Host,Tab,Key,Headers,PL).
 
 post(Host,Tab,PL) ->
-  httpc_request(post,Host,Tab,"",[],enc(prep(PL))).
+  httpc_request(post,Host,Tab,"",[],PL).
 
 trace(Host) ->
   trace(Host,[]).
@@ -67,14 +61,17 @@ httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
 httpc_request(M,Host,Tab,Key,Headers,PL) ->
   start_app(inets),
-  case httpc_request(M,url(Host,Tab,Key),Headers,PL) of
+  case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
     {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
-      {Status,Reply};
+      case Status of
+        200 -> {200,unprep(dec(Reply))};
+        _   -> {Status,Reply}
+      end;
     Error->
       Error
   end.
 
-httpc_request(M,URL,Headers,[]) when M==trace; M==get; M==delete ->
+httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
   httpc:request(M,{URL,Headers},[],[]);
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
   httpc:request(M,{URL,Headers,[],PL},[],[]).
@@ -89,6 +86,7 @@ url(Host,Tab,Key) ->
 unprep({PL} = {[{_,_}|_]}) -> [{unprep(K),unprep(V)}||{K,V}<-PL];
 unprep(L) when is_list(L) -> [unprep(E)||E<-L];
 unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
+unprep(X) when is_binary(X) -> binary_to_list(X);
 unprep(X) -> X.
 
 %% wrap proplists in {} for jiffy
@@ -110,28 +108,18 @@ to_list(X) when is_list(X)   -> X;
 to_list(X) when is_integer(X)-> integer_to_list(X);
 to_list(X) when is_atom(X)   -> atom_to_list(X).
 
-maybe_integerize(Term,Opts) ->
-  case lists:member(integerize,Opts) of
-    true -> list_to_integer(Term);
-    false-> Term
-  end.
+atomize(X) ->
+  ize(X,fun(Y) -> list_to_existing_atom(Y) end).
 
-maybe_atomize(Term,Opts) ->
-  case lists:member(no_atoms,Opts) of
-    true -> Term;
-    false-> atomize(Term)
-  end.
-
-atomize(L) when is_list(L)   -> [atomize(E) || E <- L];
-atomize(T) when is_tuple(T)  -> list_to_tuple(atomize(tuple_to_list(T)));
-atomize(B) when is_binary(B) ->
-  try list_to_atom(assert_printable(binary_to_list(B)))
-  catch _:_ -> B
+ize([],_) -> [];
+ize(S,IZE) when ?is_string(S) ->
+  try IZE(S)
+  catch _:_ -> S
   end;
-atomize(X) -> X.
-
-assert_printable(L) ->
-  lists:map(fun(C) when $ =< C,C =< $~ -> C end,L).
+ize(L,IZE) when is_list(L)        -> [ize(E,IZE) || E <- L];
+ize({I,R},IZE) when is_integer(I) -> {I,ize(R,IZE)};
+ize(T,IZE) when is_tuple(T)       -> list_to_tuple(ize(tuple_to_list(T),IZE));
+ize(X,_) -> X.
 
 enc(Term) ->
   jiffy:encode(Term).
