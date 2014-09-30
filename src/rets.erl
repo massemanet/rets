@@ -63,7 +63,7 @@ reply(Req) ->
     {"PUT",   [Tab|Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
     {"PUT",   [Tab|Key],["counter"]} -> ets({counter,Tab,Key});
     {"PUT",   [Tab|Key],["reset"]}   -> ets({reset,Tab,Key});
-    {"GET",   [[]]     ,[]}          -> je(ets({sizes,gcall({all,[]})}));
+    {"GET",   []       ,[]}          -> je(ets({sizes,gcall({all,[]})}));
     {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
     {"GET",   [Tab|Key],[]}          -> ets({get,Tab,Key});
     {"GET",   [Tab|Key],["next"]}    -> je(ets({next,Tab,Key}));

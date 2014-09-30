@@ -12,6 +12,8 @@
          post/3,
          trace/1,trace/2]).
 
+-define(is_string(S), S=="";is_integer(hd(S))).
+
 get(Host) ->
   atomize(get(Host,"")).
 get(Host,Tab) ->
@@ -80,17 +82,26 @@ start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
 
 url(Host,Tab,Key) ->
-  "http://"++to_list(Host)++":7890/"++to_list(Tab)++"/"++to_list(Key).
+  Prot = "http",
+  Port = "7890",
+  Prot++"://"++filename:join([to_list(Host)++":"++Port,Tab,to_list(Key)]).
 
-%% unwrap proplists from {} from jiffy
+to_list(X) when ?is_string(X) -> X;
+to_list(X) when is_binary(X)  -> binary_to_list(X);
+to_list(X) when is_integer(X) -> integer_to_list(X);
+to_list(X) when is_atom(X)    -> atom_to_list(X).
+
+%% convert from jiffy -> normal erlang
+%% binary() -> string() and {proplist()} -> proplist()
 unprep({PL} = {[{_,_}|_]}) -> [{unprep(K),unprep(V)}||{K,V}<-PL];
 unprep(L) when is_list(L) -> [unprep(E)||E<-L];
 unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
 unprep(X) when is_binary(X) -> binary_to_list(X);
 unprep(X) -> X.
 
-%% wrap proplists in {} for jiffy
--define(is_string(S), S=="";is_integer(hd(S))).
+%% convert from normal erlang -> jiffy
+%% string()|atom() -> binary(), proplist() -> {proplist()}
+%% true, false, null and number() are left as is
 prep(true)                 -> true;
 prep(false)                -> false;
 prep(null)                 -> null;
@@ -101,12 +112,6 @@ prep(X) when ?is_string(X) -> list_to_binary(X);
 prep(PL = [{_,_}|_])       -> {[{prep(K),prep(V)}||{K,V}<-PL]};
 prep(L) when is_list(L)    -> [prep(E)||E<-L];
 prep(T) when is_tuple(T)   -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]).
-
-
-to_list(X) when is_binary(X) -> binary_to_list(X);
-to_list(X) when is_list(X)   -> X;
-to_list(X) when is_integer(X)-> integer_to_list(X);
-to_list(X) when is_atom(X)   -> atom_to_list(X).
 
 atomize(X) ->
   ize(X,fun(Y) -> list_to_existing_atom(Y) end).
