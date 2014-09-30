@@ -154,9 +154,6 @@ update_counter(Tab,Key) ->
   catch _:_ -> ets:insert(Tab,{Key,1}),"1"
   end.
 
-jd(Term) ->
-  jiffy:decode(Term).
-
 %% key for inserts/deletes
 ikey(L) ->
   list_to_tuple([ielem(E) || E <- L]).
@@ -198,8 +195,16 @@ tab(L) ->
 gcall(What) ->
   gen_server:call(rets_tables,What).
 
+%% a nif that throws? insanity.
+jd(Term) ->
+  try jiffy:decode(Term)
+  catch {error,R} -> error({R,Term})
+  end.
+
 je(Term) ->
-  jiffy:encode(Term).
+  try jiffy:encode(Term)
+  catch {error,R} -> error({R,Term})
+  end.
 
 flat(Term) ->
   lists:flatten(io_lib:fwrite("~p",[Term])).
