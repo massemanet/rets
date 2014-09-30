@@ -127,11 +127,14 @@ size_getter(Tabs) -> {[{T,ets:info(T,size)} || T <- Tabs]}.
 key_getter(Tab) ->
   ets:foldr(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Tab).
 
-next(Tab,Key) ->
-  ets:lookup(Tab,ets:next(Tab,Key)).
+next(Tab,Key) -> nextprev(next,Tab,Key).
+prev(Tab,Key) -> nextprev(prev,Tab,Key).
 
-prev(Tab,Key) ->
-  ets:prev(Tab,Key).
+nextprev(OP,Tab,Key) ->
+  case ets:lookup(Tab,ets:OP(Tab,Key)) of
+    [{K,V}] -> {[{elems_to_binary(K),V}]};
+    []      -> throw({409,end_of_table})
+  end.
 
 getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
@@ -195,6 +198,9 @@ tab(L) ->
 gcall(What) ->
   gen_server:call(rets_tables,What).
 
+flat(Term) ->
+  lists:flatten(io_lib:fwrite("~p",[Term])).
+
 %% a nif that throws? insanity.
 jd(Term) ->
   try jiffy:decode(Term)
@@ -205,9 +211,6 @@ je(Term) ->
   try jiffy:encode(Term)
   catch {error,R} -> error({R,Term})
   end.
-
-flat(Term) ->
-  lists:flatten(io_lib:fwrite("~p",[Term])).
 
 %%%%%%%%%%
 %% eunit
