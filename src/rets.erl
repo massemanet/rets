@@ -52,10 +52,8 @@ reply(409,R) -> flat(R);
 reply(404,R) -> flat(R).
 
 cow_reply(Status,ContentType,Body,Req) ->
-  cowboy_req:reply(Status,
-                   [{<<"content-type">>, ContentType}],
-                   Body,
-                   Req).
+  Headers = [{<<"content-type">>, ContentType}],
+  cowboy_req:reply(Status,Headers,Body,Req).
 
 reply(Req) ->
   case {method(Req),uri(Req),true_headers(Req)} of
@@ -374,6 +372,21 @@ t08_test() ->
                rets_client:put(localhost,tybbe,"abc",T)),
   ?assertMatch({200,T},
                rets_client:get(localhost,tybbe,"abc")).
+
+t09_test() ->
+  restart_rets(),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,a,1)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,a,next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,a,prev)),
+  ?assertEqual({200,[{"a",1}]},
+               rets_client:get(localhost,tebbe,0,next)).
 
 restart_rets() ->
   application:stop(inets),
