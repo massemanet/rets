@@ -59,11 +59,11 @@ reply(Req) ->
   case {method(Req),uri(Req),true_headers(Req)} of
     {"PUT",   [Tab]    ,[]}          -> je(gcall({create,Tab}));
     {"PUT",   [Tab|Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
-    {"PUT",   [Tab|Key],["counter"]} -> ets({counter,Tab,Key});
-    {"PUT",   [Tab|Key],["reset"]}   -> ets({reset,Tab,Key});
+    {"PUT",   [Tab|Key],["counter"]} -> je(ets({counter,Tab,Key}));
+    {"PUT",   [Tab|Key],["reset"]}   -> je(ets({reset,Tab,Key}));
     {"GET",   []       ,[]}          -> je(ets({sizes,gcall({all,[]})}));
     {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
-    {"GET",   [Tab|Key],[]}          -> ets({get,Tab,Key});
+    {"GET",   [Tab|Key],[]}          -> je(ets({get,Tab,Key}));
     {"GET",   [Tab|Key],["next"]}    -> je(ets({next,Tab,Key}));
     {"GET",   [Tab|Key],["prev"]}    -> je(ets({prev,Tab,Key}));
     {"GET",   [Tab|Key],["multi"]}   -> je(ets({multi_get,Tab,Key}));
@@ -79,7 +79,7 @@ body(Req) ->
       true -> cowboy_req:body(Req);
       false-> {ok,[],[]}
     end,
-  Body.
+  jd(Body).
 
 method(Req) ->
   {Method,_} = cowboy_req:method(Req),
@@ -100,17 +100,16 @@ ets({sizes,Tabs})        -> size_getter([tab(T) || T <- Tabs]);
 ets({keys,Tab})          -> key_getter(tab(Tab));
 ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
 ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
-ets({counter,Tab,Key})   -> update_counter(tab(Tab),ikey(Key));
-ets({reset,Tab,Key})     -> ets:insert(tab(Tab),{ikey(Key),0}),"0";
+ets({counter,Tab,Key})   -> update_counter(tab(Tab),ikey(Key),1);
+ets({reset,Tab,Key})     -> reset_counter(tab(Tab),ikey(Key),0);
 ets({next,Tab,Key})      -> next(tab(Tab),ikey(Key));
 ets({prev,Tab,Key})      -> prev(tab(Tab),ikey(Key));
 ets({get,Tab,Key})       -> getter(tab(Tab),lkey(Key));
 ets({multi_get,Tab,Key}) -> multi_getter(tab(Tab),lkey(Key));
 ets({delete,Tab,Key})    -> ets:delete(tab(Tab),ikey(Key)).
 
-multi_inserter(Tab,KVs) ->
-  {PL} = jd(KVs),
-  ets:insert_new(Tab,[{ikey(binary_to_elems(K)),je(V)} || {K,V} <- PL]).
+multi_inserter(Tab,{KVs}) ->
+  ets:insert_new(Tab,[{ikey(binary_to_elems(K)),V} || {K,V} <- KVs]).
 
 inserter(Tab,{Ks,V}) ->
   K = ikey(Ks),
@@ -136,13 +135,10 @@ nextprev(OP,Tab,Key) ->
 
 getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
-    [{_,Res}] -> maybe_counter(Res);
+    [{_,Res}] -> Res;
     []        -> throw({404,no_such_key});
     _         -> throw({404,multiple_hits})
   end.
-
-maybe_counter(E) when is_integer(E) -> integer_to_list(E);
-maybe_counter(E) -> E.
 
 multi_getter(Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
@@ -150,10 +146,14 @@ multi_getter(Tab,Key) ->
     Hits -> lists:foldl(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Hits)
   end.
 
-update_counter(Tab,Key) ->
-  try integer_to_list(ets:update_counter(Tab,Key,1))
-  catch _:_ -> ets:insert(Tab,{Key,1}),"1"
+update_counter(Tab,Key,Incr) ->
+  try ets:update_counter(Tab,Key,Incr)
+  catch _:_ -> reset_counter(Tab,Key,Incr)
   end.
+
+reset_counter(Tab,Key,Beg) ->
+  ets:insert(Tab,{Key,Beg}),
+  Beg.
 
 %% key for inserts/deletes
 ikey(L) ->
