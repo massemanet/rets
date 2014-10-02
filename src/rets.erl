@@ -63,10 +63,10 @@ reply(Req) ->
     {"PUT",   [Tab|Key],["reset"]}   -> je(ets({reset,Tab,Key}));
     {"GET",   []       ,[]}          -> je(ets({sizes,gcall({all,[]})}));
     {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
-    {"GET",   [Tab|Key],[]}          -> je(ets({get,Tab,Key}));
+    {"GET",   [Tab|Key],[]}          -> je(ets({single,Tab,Key}));
+    {"GET",   [Tab|Key],["multi"]}   -> je(ets({multi,Tab,Key}));
     {"GET",   [Tab|Key],["next"]}    -> je(ets({next,Tab,Key}));
     {"GET",   [Tab|Key],["prev"]}    -> je(ets({prev,Tab,Key}));
-    {"GET",   [Tab|Key],["multi"]}   -> je(ets({multi_get,Tab,Key}));
     {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
     {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
     {"DELETE",[Tab|Key],[]}          -> je(ets({delete,Tab,Key}));
@@ -100,19 +100,23 @@ ets({sizes,Tabs})        -> size_getter([tab(T) || T <- Tabs]);
 ets({keys,Tab})          -> key_getter(tab(Tab));
 ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
 ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
-ets({counter,Tab,Key})   -> update_counter(tab(Tab),ikey(Key),1);
-ets({reset,Tab,Key})     -> reset_counter(tab(Tab),ikey(Key),0);
-ets({next,Tab,Key})      -> next(tab(Tab),ikey(Key));
-ets({prev,Tab,Key})      -> prev(tab(Tab),ikey(Key));
-ets({get,Tab,Key})       -> getter(tab(Tab),lkey(Key));
-ets({multi_get,Tab,Key}) -> multi_getter(tab(Tab),lkey(Key));
-ets({delete,Tab,Key})    -> ets:delete(tab(Tab),ikey(Key)).
+ets({counter,Tab,Key})   -> update_counter(tab(Tab),key_e2i(i,Key),1);
+ets({reset,Tab,Key})     -> reset_counter(tab(Tab),key_e2i(i,Key),0);
+ets({next,Tab,Key})      -> next(tab(Tab),key_e2i(i,Key));
+ets({prev,Tab,Key})      -> prev(tab(Tab),key_e2i(i,Key));
+ets({multi,Tab,Key})     -> getter(multi,tab(Tab),key_e2i(l,Key));
+ets({single,Tab,Key})    -> getter(single,tab(Tab),key_e2i(l,Key));
+ets({delete,Tab,Key})    -> ets:delete(tab(Tab),key_e2i(i,Key)).
 
 multi_inserter(Tab,{KVs}) ->
-  ets:insert_new(Tab,[{ikey(binary_to_elems(K)),V} || {K,V} <- KVs]).
+  Ops = [{mk_key(K),V} || {K,V} <- KVs],
+  ets:insert_new(Tab,Ops).
+
+mk_key(K) ->
+  key_e2i(i,string:tokens(binary_to_list(K),"/")).
 
 inserter(Tab,{Ks,V}) ->
-  K = ikey(Ks),
+  K = key_e2i(i,Ks),
   case ets:insert_new(Tab,{K,V}) of
     false-> throw({409,{exists,Tab,K}});
     true -> true
@@ -122,28 +126,26 @@ size_getter([])   -> [];
 size_getter(Tabs) -> {[{T,ets:info(T,size)} || T <- Tabs]}.
 
 key_getter(Tab) ->
-  ets:foldr(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Tab).
+  ets:foldr(fun({K,_},A) -> [key_i2e(K)|A] end,[],Tab).
 
 next(Tab,Key) -> nextprev(next,Tab,Key).
 prev(Tab,Key) -> nextprev(prev,Tab,Key).
 
 nextprev(OP,Tab,Key) ->
   case ets:lookup(Tab,ets:OP(Tab,Key)) of
-    [{K,V}] -> {[{elems_to_binary(K),V}]};
+    [{K,V}] -> {[{key_i2e(K),V}]};
     []      -> throw({409,end_of_table})
   end.
 
-getter(Tab,Key) ->
-  case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
-    [{_,Res}] -> Res;
-    []        -> throw({404,no_such_key});
+getter(single,Tab,Key) ->
+  case getter(multi,Tab,Key) of
+    {[{_,V}]} -> V;
     _         -> throw({404,multiple_hits})
-  end.
-
-multi_getter(Tab,Key) ->
+  end;
+getter(multi,Tab,Key) ->
   case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
     []   -> throw({404,no_such_key});
-    Hits -> lists:foldl(fun({K,_},A) -> [elems_to_binary(K)|A] end,[],Hits)
+    Hits -> {lists:map(fun({K,V}) -> {key_i2e(K),V} end,Hits)}
   end.
 
 update_counter(Tab,Key,Incr) ->
@@ -155,33 +157,31 @@ reset_counter(Tab,Key,Beg) ->
   ets:insert(Tab,{Key,Beg}),
   Beg.
 
-%% key for inserts/deletes
-ikey(L) ->
-  list_to_tuple([ielem(E) || E <- L]).
+%% key handling
+%% the external form of a key is the path part of an url, basically
+%% any number of slash-separated elements, each of which is
+%% string() | number(), like;
+%%  "a/ddd/b/a_b_/1/3.14/x"
+%% an element can not be a single underscore, "_". the single underscore
+%% is used as a wildcard in lookups.
+%% the internal representation is a tuple of string binaries;
+%%  {<<"a">>,<<"ddd">>,<<"b">>,<<"a_b_">>,<<"1">>,<<"3.14">>,<<"x">>}
 
-ielem("_") -> throw({404,key_has_underscore});
-ielem(E)   -> l2b(E).
+%% transform key, external to internal. there are two styles;
+%% "i", for inserts/deletes; "_" is forbidden
+%% "l", for lookups; "_" is a wildcard
+key_e2i(Style,L) -> list_to_tuple([elem(Style,E) || E <- L]).
 
-%% key for lookups
-lkey(L) ->
-  list_to_tuple([lelem(E) || E <- L]).
+elem(i,"_") -> throw({404,key_has_underscore});
+elem(l,"_") -> '_';
+elem(_,E)   -> l2b(E).
 
-lelem("_") -> '_';
-lelem(E)   -> l2b(E).
-
-%% exporting keys
-elems_to_binary(T) ->
+%% transform key, internal to external.
+key_i2e(T) ->
   l2b(join(tuple_to_list(T),<<"/">>)).
 
 join([E],_) -> [E];
 join([E|R],D) -> [E,D|join(R,D)].
-
-%% importing keys
-binary_to_elems(B) ->
-  string:tokens(binary_to_list(B),"/").
-
-l2b(L) ->
-  list_to_binary(L).
 
 %% table names
 tab(L) ->
@@ -199,12 +199,16 @@ gcall(What) ->
 flat(Term) ->
   lists:flatten(io_lib:fwrite("~p",[Term])).
 
+l2b(L) ->
+  list_to_binary(L).
+
 %% a nif that throws? insanity.
 jd(Term) ->
   try jiffy:decode(Term)
   catch {error,R} -> error({R,Term})
   end.
 
+%% a nif that throws? insanity.
 je(Term) ->
   try jiffy:encode(Term)
   catch {error,R} -> error({R,Term})
@@ -358,7 +362,7 @@ t07_test() ->
                rets_client:get(localhost,tibbe,'a')),
   ?assertEqual({404,"multiple_hits"},
                rets_client:get(localhost,tibbe,'a/_/_')),
-  ?assertEqual({200,["a/2/x","a/1/x"]},
+  ?assertEqual({200,[{"a/1/x","primo"},{"a/2/x","segundo"}]},
                rets_client:get(localhost,tibbe,'a/_/_',multi)),
   ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,'b/_/_',multi)).
