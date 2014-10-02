@@ -47,9 +47,10 @@ handle(Req,State) ->
     end,
   {ok,Req2,State}.
 
-reply(500,R) -> flat({R,erlang:get_stacktrace()});
+reply(404,R) -> flat(R);
+reply(405,R) -> flat(R);
 reply(409,R) -> flat(R);
-reply(404,R) -> flat(R).
+reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 
 cow_reply(Status,ContentType,Body,Req) ->
   Headers = [{<<"content-type">>, ContentType}],
@@ -70,6 +71,7 @@ reply(Req) ->
     {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
     {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
     {"DELETE",[Tab|Key],[]}          -> je(ets({delete,Tab,Key}));
+    {"TRACE", _,_}                   -> throw({405,"method not allowed"});
     X                                -> throw({404,X})
   end.
 
@@ -83,7 +85,7 @@ body(Req) ->
 
 method(Req) ->
   {Method,_} = cowboy_req:method(Req),
-  binary_to_list(Method).
+  string:to_upper(binary_to_list(Method)).
 
 uri(Req) ->
   {URI,_} = cowboy_req:path_info(Req),
