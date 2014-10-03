@@ -12,21 +12,24 @@
          post/3,
          trace/1,trace/2]).
 
+-define(is_string(S), S=="";is_integer(hd(S))).
+
 get(Host) ->
-  get(Host,"").
+  atomize(get(Host,"")).
 get(Host,Tab) ->
   get(Host,Tab,"").
 get(Host,Tab,Key) ->
-  get(Host,Tab,Key,[]).
-get(Host,Tab,Key,Opt) when is_atom(Opt) ->
-  get(Host,Tab,Key,[Opt]);
-get(Host,Tab,Key,Opts) ->
-  case httpc_request(get,Host,Tab,Key,get_opts(Opts)) of
-    {200,Reply} ->
-      {200,maybe_atomize(unprep(dec(Reply)),Opts)};
-    Error ->
-      Error
-  end.
+  get(Host,Tab,Key,[],[]).
+get(Host,Tab,Key,next) ->
+  get(Host,Tab,Key,[{"next","true"}],[]);
+get(Host,Tab,Key,prev) ->
+  get(Host,Tab,Key,[{"prev","true"}],[]);
+get(Host,Tab,Key,multi) ->
+  get(Host,Tab,Key,[{"multi","true"}],[]).
+
+%% internal
+get(Host,Tab,Key,Headers,[]) ->
+  httpc_request(get,Host,Tab,Key,Headers).
 
 delete(Host,Tab) ->
   delete(Host,Tab,"").
@@ -36,14 +39,18 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  put_counter(Host,Tab,Key,"counter");
+  put(Host,Tab,Key,[{"counter","true"}],[],[]);
 put(Host,Tab,Key,reset) ->
-  put_counter(Host,Tab,Key,"reset");
+  put(Host,Tab,Key,[{"reset","true"}],[],[]);
 put(Host,Tab,Key,PL) ->
-  httpc_request(put,Host,Tab,Key,[],enc(prep(PL))).
+  put(Host,Tab,Key,[],PL,[]).
+
+%% internal
+put(Host,Tab,Key,Headers,PL,[]) ->
+  httpc_request(put,Host,Tab,Key,Headers,PL).
 
 post(Host,Tab,PL) ->
-  httpc_request(post,Host,Tab,"",[],enc(prep(PL))).
+  httpc_request(post,Host,Tab,"",[],PL).
 
 trace(Host) ->
   trace(Host,[]).
@@ -51,31 +58,22 @@ trace(Host,Headers) ->
   httpc_request(trace,Host,"","",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_opts([]) -> [];
-get_opts(Opts) ->
-  case lists:member(multi,Opts) of
-    true -> [{"multi","true"}];
-    false-> []
-end.
-
-put_counter(Host,Tab,Key,Header) ->
-  case httpc_request(put,Host,Tab,Key,[{Header,"true"}],[]) of
-    {200,Reply} -> {200,list_to_integer(Reply)};
-    {Status,Reply} -> {Status,Reply}
-  end.
 
 httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
 httpc_request(M,Host,Tab,Key,Headers,PL) ->
   start_app(inets),
-  case httpc_request(M,url(Host,Tab,Key),Headers,PL) of
+  case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
     {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
-      {Status,Reply};
+      case Status of
+        200 -> {200,unprep(dec(Reply))};
+        _   -> {Status,Reply}
+      end;
     Error->
       Error
   end.
 
-httpc_request(M,URL,Headers,[]) when M==trace; M==get; M==delete ->
+httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
   httpc:request(M,{URL,Headers},[],[]);
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
   httpc:request(M,{URL,Headers,[],PL},[],[]).
@@ -84,41 +82,49 @@ start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
 
 url(Host,Tab,Key) ->
-  "http://"++to_list(Host)++":7890/"++to_list(Tab)++"/"++to_list(Key).
+  Prot = "http",
+  Port = "7890",
+  Prot++"://"++filename:join([to_list(Host)++":"++Port,Tab,to_list(Key)]).
 
-%% unwrap proplists from {} from jiffy
+to_list(X) when ?is_string(X) -> X;
+to_list(X) when is_binary(X)  -> binary_to_list(X);
+to_list(X) when is_integer(X) -> integer_to_list(X);
+to_list(X) when is_atom(X)    -> atom_to_list(X).
+
+%% convert from jiffy -> normal erlang
+%% binary() -> string() and {proplist()} -> proplist()
 unprep({PL} = {[{_,_}|_]}) -> [{unprep(K),unprep(V)}||{K,V}<-PL];
 unprep(L) when is_list(L) -> [unprep(E)||E<-L];
 unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
+unprep(X) when is_binary(X) -> binary_to_list(X);
 unprep(X) -> X.
 
-%% wrap proplists in {} for jiffy
-prep(PL = [{_,_}|_]) -> {[{prep(K),prep(V)}||{K,V}<-PL]};
-prep(L) when is_list(L) -> [prep(E)||E<-L];
-prep(T) when is_tuple(T) -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]);
-prep(X) -> X.
+%% convert from normal erlang -> jiffy
+%% string()|atom() -> binary(), proplist() -> {proplist()}
+%% true, false, null and number() are left as is
+prep(true)                 -> true;
+prep(false)                -> false;
+prep(null)                 -> null;
+prep(X) when is_binary(X)  -> X;
+prep(X) when is_number(X)  -> X;
+prep(X) when is_atom(X)    -> list_to_binary(atom_to_list(X));
+prep(X) when ?is_string(X) -> list_to_binary(X);
+prep(PL = [{_,_}|_])       -> {[{prep(K),prep(V)}||{K,V}<-PL]};
+prep(L) when is_list(L)    -> [prep(E)||E<-L];
+prep(T) when is_tuple(T)   -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]).
 
-to_list(X) when is_binary(X) -> binary_to_list(X);
-to_list(X) when is_list(X)   -> X;
-to_list(X) when is_integer(X)-> integer_to_list(X);
-to_list(X) when is_atom(X)   -> atom_to_list(X).
+atomize(X) ->
+  ize(X,fun(Y) -> list_to_existing_atom(Y) end).
 
-maybe_atomize(Term,Opts) ->
-  case lists:member(no_atoms,Opts) of
-    true -> Term;
-    false-> atomize(Term)
-  end.
-
-atomize(L) when is_list(L)   -> [atomize(E) || E <- L];
-atomize(T) when is_tuple(T)  -> list_to_tuple(atomize(tuple_to_list(T)));
-atomize(B) when is_binary(B) ->
-  try list_to_atom(assert_printable(binary_to_list(B)))
-  catch _:_ -> B
+ize([],_) -> [];
+ize(S,IZE) when ?is_string(S) ->
+  try IZE(S)
+  catch _:_ -> S
   end;
-atomize(X) -> X.
-
-assert_printable(L) ->
-  lists:map(fun(C) when $ =< C,C =< $~ -> C end,L).
+ize(L,IZE) when is_list(L)        -> [ize(E,IZE) || E <- L];
+ize({I,R},IZE) when is_integer(I) -> {I,ize(R,IZE)};
+ize(T,IZE) when is_tuple(T)       -> list_to_tuple(ize(tuple_to_list(T),IZE));
+ize(X,_) -> X.
 
 enc(Term) ->
   jiffy:encode(Term).
