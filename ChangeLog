@@ -1,9 +1,111 @@
-commit aa37a651c14e6bac177af2aa1581b8f5ade901c3
+commit 8de899f9d5ed39781f5dd87797052d93a64f241e
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Oct 3 09:56:53 2014 +0200
+
+    v0.7.1
+
+src/rets.app.src
+
+commit 4e4b891ebccca5652c83cf42d920a8fcc7f85d80
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Oct 2 12:42:41 2014 +0200
+
+    error message for TRACE method
+
+src/rets.erl
+
+commit 5e547cd8a1be7b72f548d7032d4a6b2c8de0c053
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Oct 2 12:08:29 2014 +0200
+
+    fix the multi/single options
+
+src/rets.erl
+
+commit 84a8fa031596175901c5d68b021252f82cedce58
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 1 13:17:58 2014 +0200
+
+    store payload as jiffy-decoded erlang
+
+src/rets.erl
+
+commit 150c128539b3e3e14761637123f46f948203b74f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Sep 30 14:58:54 2014 +0200
+
+    next/prev test case
+
+src/rets.erl
+
+commit c34a01a9cac89bd28e24e6580c4461600bb46746
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Sep 30 14:43:40 2014 +0200
+
+    implement next/prex
+
+src/rets.erl
+
+commit cb363dd1b4effbbdd9f00e36ccadeafc51d83a80
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Sep 30 14:13:15 2014 +0200
+
+    apparently, jiffy throws(!) errors. bad bad bad.
+
+src/rets.erl
+
+commit 33c6ca7cf1677309ea1ff4b97dd8b518a50ecf77
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Sep 30 13:46:23 2014 +0200
+
+    improve json-ification
+
+src/rets.erl
+src/rets_client.erl
+
+commit 34d3655a75e5cf39c135ab88b868cec382234d1a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Tue Sep 30 11:45:36 2014 +0200
+
+    json-ify
+
+src/rets.erl
+src/rets_client.erl
+
+commit 80b13348f569a2a1b616a3bcac258b493969f2b3
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Sep 29 21:09:46 2014 +0200
+
+    fix build issues
+
+rebar.config
+src/mod_fun.erl
+src/rets_client.erl
+
+commit 178afaf78192127d97fa39a69605074193ac5437
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Sep 29 16:45:35 2014 +0200
+
+    input validate to json types (numbers, strings, proplists,boolean,null)
+
+src/rets_client.erl
+
+commit dadf9a4faceaaf173eaaaba396e941180f51b9f1
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Sep 26 17:34:43 2014 +0200
+
+    refactor for prev/next. not working yet.
+
+src/rets.erl
+src/rets_client.erl
+
+commit 0cfd31372c811372b7e7697bb9ffcecdbbe00c10
 Author: mats cronqvist <masse@klarna.com>
 Date:   Wed Sep 3 15:28:24 2014 +0200
 
     v0.7.0
 
+ChangeLog
 src/rets.app.src
 
 commit 718835baa88a7faa32e4b6f70b2f412097d9dcf7
