@@ -93,11 +93,11 @@ to_list(X) when is_atom(X)    -> atom_to_list(X).
 
 %% convert from jiffy -> normal erlang
 %% binary() -> string() and {proplist()} -> proplist()
-unprep({PL} = {[{_,_}|_]}) -> [{unprep(K),unprep(V)}||{K,V}<-PL];
-unprep(L) when is_list(L) -> [unprep(E)||E<-L];
-unprep(T) when is_tuple(T) -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
-unprep(X) when is_binary(X) -> binary_to_list(X);
-unprep(X) -> X.
+unprep({PL} = {[{_,_}|_]})  -> [{unprep(K),unprep(V)}||{K,V}<-PL];
+unprep(L) when is_list(L)   -> [unprep(E)||E<-L];
+unprep(T) when is_tuple(T)  -> list_to_tuple([unprep(E)||E<-tuple_to_list(T)]);
+unprep(X) when is_binary(X) -> unicode:characters_to_list(X,utf8);
+unprep(X)                   -> X.
 
 %% convert from normal erlang -> jiffy
 %% string()|atom() -> binary(), proplist() -> {proplist()}
