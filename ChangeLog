@@ -1,9 +1,52 @@
-commit 8de899f9d5ed39781f5dd87797052d93a64f241e
+commit f9bd7f22c9dcaad524bea7d34322028d6dd5bd87
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 8 21:31:27 2014 +0200
+
+    v0.8.0
+
+src/rets.app.src
+
+commit fba23fc0f7b708aa3d5cd231e434487e859c177c
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 8 21:28:04 2014 +0200
+
+    fixup build system
+
+Makefile
+rebar.config
+
+commit 4bee35b6b9353e74b6f7e297813d055edc5758e9
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 8 20:35:54 2014 +0200
+
+    test case for unicode-in-R16 troubles
+
+src/rets.erl
+src/rets_client.erl
+
+commit 9ae4ea923b34f294682316c4a94d35c96abbda9f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 8 20:22:45 2014 +0200
+
+    fix unicode-in-R16 troubles
+
+src/rets_client.erl
+
+commit c8aacd9092883288ad65c585f84893165a2486a1
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Oct 8 20:27:43 2014 +0200
+
+    gitignore .rebar
+
+.gitignore
+
+commit 19116c25e7e6fea5b63e62ed6a4c97f835d32087
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Oct 3 09:56:53 2014 +0200
 
     v0.7.1
 
+ChangeLog
 src/rets.app.src
 
 commit 4e4b891ebccca5652c83cf42d920a8fcc7f85d80
