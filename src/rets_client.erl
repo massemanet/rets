@@ -108,7 +108,7 @@ prep(null)                 -> null;
 prep(X) when is_binary(X)  -> X;
 prep(X) when is_number(X)  -> X;
 prep(X) when is_atom(X)    -> list_to_binary(atom_to_list(X));
-prep(X) when ?is_string(X) -> list_to_binary(X);
+prep(X) when ?is_string(X) -> unicode:characters_to_binary(X,unicode,utf8);
 prep(PL = [{_,_}|_])       -> {[{prep(K),prep(V)}||{K,V}<-PL]};
 prep(L) when is_list(L)    -> [prep(E)||E<-L];
 prep(T) when is_tuple(T)   -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]).
