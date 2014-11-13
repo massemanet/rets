@@ -108,7 +108,7 @@ ets({next,Tab,Key})      -> next(tab(Tab),key_e2i(i,Key));
 ets({prev,Tab,Key})      -> prev(tab(Tab),key_e2i(i,Key));
 ets({multi,Tab,Key})     -> getter(multi,tab(Tab),key_e2i(l,Key));
 ets({single,Tab,Key})    -> getter(single,tab(Tab),key_e2i(l,Key));
-ets({delete,Tab,Key})    -> ets:delete(tab(Tab),key_e2i(i,Key)).
+ets({delete,Tab,Key})    -> deleter(tab(Tab),key_e2i(i,Key)).
 
 multi_inserter(Tab,{KVs}) ->
   Ops = [{mk_key(K),V} || {K,V} <- KVs],
@@ -137,6 +137,12 @@ nextprev(OP,Tab,Key) ->
   case ets:lookup(Tab,ets:OP(Tab,Key)) of
     [{K,V}] -> {[{key_i2e(K),V}]};
     []      -> throw({409,end_of_table})
+  end.
+
+deleter(Tab,Key) ->
+  case ets:lookup(Tab,Key) of
+    []        -> null;
+    [{Key,V}] -> ets:delete(Tab,Key),V
   end.
 
 getter(single,Tab,Key) ->
@@ -327,7 +333,7 @@ t06_test() ->
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,17,foo)),
-  ?assertEqual({200,true},
+  ?assertEqual({200,"foo"},
                rets_client:delete(localhost,tibbe,17)),
   ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,17)),
