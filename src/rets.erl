@@ -98,17 +98,17 @@ headers(Req) ->
 true_headers(Req) ->
   [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
 
-ets({sizes,Tabs})        -> size_getter([tab(T) || T <- Tabs]);
-ets({keys,Tab})          -> key_getter(tab(Tab));
-ets({insert,Tab,K,V})    -> inserter(tab(Tab),{K,V});
-ets({insert,Tab,KVs})    -> multi_inserter(tab(Tab),KVs);
-ets({counter,Tab,Key})   -> update_counter(tab(Tab),key_e2i(i,Key),1);
-ets({reset,Tab,Key})     -> reset_counter(tab(Tab),key_e2i(i,Key),0);
-ets({next,Tab,Key})      -> next(tab(Tab),key_e2i(i,Key));
-ets({prev,Tab,Key})      -> prev(tab(Tab),key_e2i(i,Key));
-ets({multi,Tab,Key})     -> getter(multi,tab(Tab),key_e2i(l,Key));
-ets({single,Tab,Key})    -> getter(single,tab(Tab),key_e2i(l,Key));
-ets({delete,Tab,Key})    -> deleter(tab(Tab),key_e2i(i,Key)).
+ets({sizes,Tabs})      -> size_getter([tab(T) || T <- Tabs]);
+ets({keys,Tab})        -> key_getter(tab(Tab));
+ets({insert,Tab,K,V})  -> inserter(tab(Tab),{K,V});
+ets({insert,Tab,KVs})  -> multi_inserter(tab(Tab),KVs);
+ets({counter,Tab,Key}) -> update_counter(tab(Tab),key_e2i(i,Key),1);
+ets({reset,Tab,Key})   -> reset_counter(tab(Tab),key_e2i(i,Key),0);
+ets({next,Tab,Key})    -> next(tab(Tab),key_e2i(i,Key));
+ets({prev,Tab,Key})    -> prev(tab(Tab),key_e2i(i,Key));
+ets({multi,Tab,Key})   -> getter(multi,tab(Tab),key_e2i(l,Key));
+ets({single,Tab,Key})  -> getter(single,tab(Tab),key_e2i(l,Key));
+ets({delete,Tab,Key})  -> deleter(tab(Tab),key_e2i(i,Key)).
 
 multi_inserter(Tab,{KVs}) ->
   Ops = [{mk_key(K),V} || {K,V} <- KVs],
