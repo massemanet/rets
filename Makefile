@@ -48,7 +48,7 @@ release: release_patch
 ## testing
 
 eunit: compile-all
-	@$(REBAR) compile eunit skip_deps=true
+	@$(REBAR) eunit skip_deps=true
 
 xref: compile-all
 	@$(REBAR) compile xref skip_deps=true
@@ -61,6 +61,6 @@ xref: compile-all
 deps/.dialyzer_plt: ~/.dialyzer_plt
 	dialyzer --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
 
-dialyze: compile-all ~/.dialyzer_plt deps/.dialyzer_plt
+dialyze: ~/.dialyzer_plt
 	$(shell [ -d .eunit ] && rm -rf .eunit)
 	dialyzer ebin -nn --plt deps/.dialyzer_plt

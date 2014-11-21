@@ -1,18 +1,24 @@
 #!/bin/sh
 
 function usage () {
-    echo "$0 major|minor|patch"
+    echo "$1"
     exit
 }
 
-[ -f $PWD/src/*.app.src ] && APPSRC=`echo $PWD/src/*.app.src` || usage
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TAG=$(git name-rev --tags --name-only $(git rev-parse HEAD))
+OVSN=$(git describe | cut -f1 -d"-")
+
+[ "$BRANCH" != "master" ] && usage "Not on master"
+[ "$TAG" != "undefined" ] && usage "Already tagged"
+[ "$OVSN" = "" ]          && usage "No old version"
+
 if [ -z "$1" ]; then
     size="patch"
 else
     size=$1
 fi
 
-OVSN=`grep vsn src/*.app.src | cut -f2 -d"\""`
 MAJOR=`echo $OVSN | cut -f1 -d"."`
 MINOR=`echo $OVSN | cut -f2 -d"."`
 PATCH=`echo $OVSN | cut -f3 -d"."`
@@ -23,9 +29,9 @@ elif [ "$size" == "minor" ]; then
 elif [ "$size" == "patch" ]; then
     NVSN=$MAJOR.$MINOR.$(($PATCH + 1))
 else
-    usage
+    usage "$0 major|minor|patch"
 fi
-echo $APPSRC $OVSN"->"$NVSN
+echo $OVSN"->"$NVSN
 
 sed  s/$OVSN/$NVSN/ < $APPSRC > $$ && mv $$ $APPSRC
 git add $APPSRC
@@ -36,5 +42,5 @@ git log | grep Author | grep -Evi "vagrant|no author|mats cronqvist" \
   | sort -u | cut -c8- >> AUTHORS
 git add ChangeLog AUTHORS
 git commit --amend --reuse-message HEAD
-git tag -a -m"$NVSN" $NVSN
-#git push --tags
+
+git tag -a -m"$NVSN" $NVSN && echo "git push && git push --tags"

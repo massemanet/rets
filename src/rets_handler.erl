@@ -4,42 +4,34 @@
 %% @doc
 %% @end
 
--module('rets_tables').
+-module(rets_handler).
 -author('mats cronqvist').
 
 %% the API
 -export([state/0]).
 
 %% for application supervisor
--export([start_link/0]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -behaviour(gen_server).
 -export([init/1,terminate/2,code_change/3,
          handle_call/3,handle_cast/2,handle_info/2]).
 
-%% declare the state
--record(state,{tables = [],
-               props = [named_table,ordered_set,public]}).
-
-%% add all records here, to kludge around the record kludge.
-rec_info(state) -> record_info(fields,state);
-rec_info(_)     -> [].
-
 %% the API
 state() ->
   gen_server:call(?MODULE,state).
 
 %% for application supervisor
-start_link() ->
-  gen_server:start_link({local,?MODULE},?MODULE,[],[]).
+start_link(Args) ->
+  gen_server:start_link({local,?MODULE},?MODULE,Args,[]).
 
 %% gen_server callbacks
-init(_) ->
-  {ok,#state{}}.
-
-terminate(_Reason,_State) ->
-  ok.
+init(Args) ->
+  process_flag(trap_exit, true),
+  do_init(Args).
+terminate(shutdown,State) ->
+  do_terminate(State).
 
 code_change(_OldVsn,State,_Extra) ->
   {ok,State}.
@@ -49,8 +41,7 @@ handle_call(state,_From,State) ->
 handle_call(stop,_From,State) ->
   {stop,normal,stopping,State};
 handle_call(What,_From,State) ->
-  {Reply,S} = do_handle_call(What,State),
-  {reply,Reply,S}.
+  do_handle_call(What,State).
 
 handle_cast(What,State) ->
   erlang:display({cast,What}),
@@ -79,27 +70,35 @@ expand_recs(Term) ->
 
 %% boilerplate ends here
 
-do_handle_call({all,[]},S) ->
-  {S#state.tables,S};
-do_handle_call({create,Tab},S) ->
-  {true,assert_created(Tab,S)};
-do_handle_call({delete,Tab},S) ->
-  {true,assert_deleted(Tab,S)}.
+%% declare the state
+-record(state,{
+          %% Settable parameters
+          %% Set from erl start command (erl -rets backend leveldb)
+          backend,  %% leveldb|ets
+          env,      %% result of application:get_all_env(rets)
 
-assert_created(Tab,S = #state{tables=Ts,props=Ps}) ->
-  case lists:member(Tab,Ts) of
-    true ->
-      S;
-    false->
-      ets:new(list_to_atom(Tab),Ps),
-      S#state{tables=S#state.tables++[Tab]}
-  end.
+          %% Non-settable paramaters
+          cb_mod,  %% rets BE callback module
+          cb_state %% BE callback state
+         }).
 
-assert_deleted(Tab,S = #state{tables=Ts}) ->
-  case lists:member(Tab,Ts) of
-    true ->
-      ets:delete(list_to_atom(Tab)),
-      S#state{tables=S#state.tables--[Tab]};
-    false->
-      S
+rec_info(state) -> record_info(fields,state).
+
+do_init(Args) ->
+  BE = proplists:get_value(backend,Args,ets),
+  CB = list_to_atom("rets_"++atom_to_list(BE)),
+  {ok,#state{backend  = BE,
+             env      = Args,
+             cb_mod   = CB,
+             cb_state = CB:init(Args)}}.
+
+do_terminate(State) ->
+  (State#state.cb_mod):terminate(State#state.cb_state).
+
+do_handle_call({F,Args},State) ->
+  try
+    {Reply,CBS} = (State#state.cb_mod):F(State#state.cb_state,Args),
+    {reply,{ok,Reply},State#state{cb_state=CBS}}
+  catch
+    throw:{Status,Term} -> {reply,{Status,Term},State}
   end.

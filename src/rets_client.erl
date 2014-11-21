@@ -21,11 +21,11 @@ get(Host,Tab) ->
 get(Host,Tab,Key) ->
   get(Host,Tab,Key,[],[]).
 get(Host,Tab,Key,next) ->
-  get(Host,Tab,Key,[{"next","true"}],[]);
+  get(Host,Tab,Key,[{"rets","next"}],[]);
 get(Host,Tab,Key,prev) ->
-  get(Host,Tab,Key,[{"prev","true"}],[]);
+  get(Host,Tab,Key,[{"rets","prev"}],[]);
 get(Host,Tab,Key,multi) ->
-  get(Host,Tab,Key,[{"multi","true"}],[]).
+  get(Host,Tab,Key,[{"rets","multi"}],[]).
 
 %% internal
 get(Host,Tab,Key,Headers,[]) ->
@@ -39,9 +39,9 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  put(Host,Tab,Key,[{"counter","true"}],[],[]);
+  put(Host,Tab,Key,[{"rets","counter"}],[],[]);
 put(Host,Tab,Key,reset) ->
-  put(Host,Tab,Key,[{"reset","true"}],[],[]);
+  put(Host,Tab,Key,[{"rets","reset"}],[],[]);
 put(Host,Tab,Key,PL) ->
   put(Host,Tab,Key,[],PL,[]).
 
@@ -84,7 +84,7 @@ start_app(M) ->
 url(Host,Tab,Key) ->
   Prot = "http",
   Port = "7890",
-  Prot++"://"++filename:join([to_list(Host)++":"++Port,Tab,to_list(Key)]).
+  Prot++"://"++to_list(Host)++":"++Port++"/"++to_list(Tab)++"/"++to_list(Key).
 
 to_list(X) when ?is_string(X) -> X;
 to_list(X) when is_binary(X)  -> binary_to_list(X);

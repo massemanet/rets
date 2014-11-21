@@ -69,6 +69,7 @@ item_start() {
         -setcookie $ITEM \
         -boot start_sasl \
         -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
+        -rets backend ets \
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \

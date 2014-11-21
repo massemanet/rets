@@ -10,6 +10,8 @@
 
 -export([start/0]).       % start the application
 
+-export([start/1]).       % interactive start, with backend choice
+
 -behavior(cowboy_http_handler).
 -export([handle/2,
          init/3,
@@ -21,6 +23,13 @@
 start() ->
   application:ensure_all_started(rets).
 
+start(Backend) ->
+  case Backend of
+    leveldb -> application:set_env(rets,backend,leveldb);
+    ets     -> application:unset_env(rets,backend)
+  end,
+  start().
+
 %% called from rets_app
 cowboy_opts() ->
   [{name,rets_listener},
@@ -31,57 +40,76 @@ cowboy_opts() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% cowboy callbacks
 init({tcp, http}, Req, []) ->
-  {ok, Req, init}.
+  {ok, Req, []}.
 
 terminate(_Reason, _Req, _State) ->
   ok.
 
 %% called from cowboy. Req is the cowboy opaque state object.
 handle(Req,State) ->
-  {ok,Req2} =
-    try
-      cow_reply(200,<<"application/json">>,reply(Req),Req)
-    catch
-      {Status,R} -> cow_reply(Status,<<"text/plain">>,reply(Status,R),Req);
-      C:R        -> cow_reply(500,<<"text/plain">>,reply(500,{C,R}),Req)
-    end,
-  {ok,Req2,State}.
+  {ok,mk_reply(Req),State}.
+
+mk_reply(Req) ->
+  try
+    cow_reply(200,<<"application/json">>,je(reply(Req)),Req)
+  catch
+    throw:{Status,R} ->
+      cow_reply(Status,<<"text/plain">>,reply(Status,R),Req)
+  end.
+
+cow_reply(Status,ContentType,Body,Req) ->
+  Headers = [{<<"content-type">>, ContentType}],
+  {ok,Rq} = cowboy_req:reply(Status,Headers,Body,Req),
+  Rq.
 
 reply(404,R) -> flat(R);
 reply(405,R) -> flat(R);
 reply(409,R) -> flat(R);
 reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 
-cow_reply(Status,ContentType,Body,Req) ->
-  Headers = [{<<"content-type">>, ContentType}],
-  cowboy_req:reply(Status,Headers,Body,Req).
-
 reply(Req) ->
-  case {method(Req),uri(Req),true_headers(Req)} of
-    {"PUT",   [Tab]    ,[]}          -> je(gcall({create,Tab}));
-    {"PUT",   [Tab|Key],[]}          -> je(ets({insert,Tab,Key,body(Req)}));
-    {"PUT",   [Tab|Key],["counter"]} -> je(ets({counter,Tab,Key}));
-    {"PUT",   [Tab|Key],["reset"]}   -> je(ets({reset,Tab,Key}));
-    {"GET",   []       ,[]}          -> je(ets({sizes,gcall({all,[]})}));
-    {"GET",   [Tab]    ,[]}          -> je(ets({keys,Tab}));
-    {"GET",   [Tab|Key],[]}          -> je(ets({single,Tab,Key}));
-    {"GET",   [Tab|Key],["multi"]}   -> je(ets({multi,Tab,Key}));
-    {"GET",   [Tab|Key],["next"]}    -> je(ets({next,Tab,Key}));
-    {"GET",   [Tab|Key],["prev"]}    -> je(ets({prev,Tab,Key}));
-    {"POST",  [Tab]    ,[]}          -> je(ets({insert,Tab,body(Req)}));
-    {"DELETE",[Tab]    ,[]}          -> je(gcall({delete,Tab}));
-    {"DELETE",[Tab|Key],[]}          -> je(ets({delete,Tab,Key}));
-    {"TRACE", _,_}                   -> throw({405,"method not allowed"});
-    X                                -> throw({404,X})
+  x(method(Req),uri(Req),rets_headers(Req),Req).
+
+x("PUT",   [Tab]    ,[],_)          -> g({create,[Tab]});
+x("PUT",   [Tab|Key],[],R)          -> g({insert,[Tab,chkk(Key),body(R)]});
+x("PUT",   [Tab|Key],["counter"],_) -> g({bump,  [Tab,chkk(Key),1]});
+x("PUT",   [Tab|Key],["reset"],_)   -> g({reset, [Tab,chkk(Key),0]});
+x("GET",   []       ,[],_)          -> g({sizes, []});
+x("GET",   [Tab]    ,[],_)          -> g({keys,  [Tab]});
+x("GET",   [Tab|Key],[],_)          -> g({single,[Tab,Key]});
+x("GET",   [Tab|Key],["multi"],_)   -> g({multi, [Tab,Key]});
+x("GET",   [Tab|Key],["next"],_)    -> g({next,  [Tab,Key]});
+x("GET",   [Tab|Key],["prev"],_)    -> g({prev,  [Tab,Key]});
+x("POST",  [Tab]    ,[],R)          -> g({insert,[Tab,chkb(body(R))]});
+x("DELETE",[Tab]    ,[],_)          -> g({delete,[Tab]});
+x("DELETE",[Tab|Key],[],_)          -> g({delete,[Tab,Key]});
+x("TRACE",_,_,_)                    -> throw({405,"method not allowed"});
+x(Meth,URI,Headers,Bdy)             -> throw({404,{Meth,URI,Headers,Bdy}}).
+
+g(FArgs) ->
+  case gen_server:call(rets_handler,FArgs) of
+    {ok,Reply} -> Reply;
+    Bad        -> throw(Bad)
   end.
 
+chkb({Body}) -> lists:map(fun chk_bp/1,Body).
+chk_bp({Key,Val}) ->
+  {chkk(string:tokens(binary_to_list(Key),"/")),Val}.
+
+chkk(Key) -> lists:map(fun chk_el/1,Key).
+chk_el(".") -> throw({404,key_element_is_period});
+chk_el(El)  -> El.
+
 body(Req) ->
-  {ok,Body,_} =
-    case cowboy_req:has_body(Req) of
-      true -> cowboy_req:body(Req);
-      false-> {ok,[],[]}
-    end,
-  jd(Body).
+  case cowboy_req:has_body(Req) of
+    true ->
+      {ok,Body,_} = cowboy_req:body(Req),
+      case jd(Body) of
+        <<>> -> [];
+        B    -> B
+      end;
+    false-> []
+  end.
 
 method(Req) ->
   {Method,_} = cowboy_req:method(Req),
@@ -89,126 +117,38 @@ method(Req) ->
 
 uri(Req) ->
   {URI,_} = cowboy_req:path_info(Req),
-  [binary_to_list(B) || B <- URI].
+  chk_uri(URI).
 
-headers(Req) ->
-  {Headers,_}= cowboy_req:headers(Req),
-  Headers.
-
-true_headers(Req) ->
-  [binary_to_list(K) || {K,<<"true">>} <- headers(Req)].
-
-ets({sizes,Tabs})      -> size_getter([tab(T) || T <- Tabs]);
-ets({keys,Tab})        -> key_getter(tab(Tab));
-ets({insert,Tab,K,V})  -> inserter(tab(Tab),{K,V});
-ets({insert,Tab,KVs})  -> multi_inserter(tab(Tab),KVs);
-ets({counter,Tab,Key}) -> update_counter(tab(Tab),key_e2i(i,Key),1);
-ets({reset,Tab,Key})   -> reset_counter(tab(Tab),key_e2i(i,Key),0);
-ets({next,Tab,Key})    -> next(tab(Tab),key_e2i(i,Key));
-ets({prev,Tab,Key})    -> prev(tab(Tab),key_e2i(i,Key));
-ets({multi,Tab,Key})   -> getter(multi,tab(Tab),key_e2i(l,Key));
-ets({single,Tab,Key})  -> getter(single,tab(Tab),key_e2i(l,Key));
-ets({delete,Tab,Key})  -> deleter(tab(Tab),key_e2i(i,Key)).
-
-multi_inserter(Tab,{KVs}) ->
-  Ops = [{mk_key(K),V} || {K,V} <- KVs],
-  ets:insert_new(Tab,Ops).
-
-mk_key(K) ->
-  key_e2i(i,string:tokens(binary_to_list(K),"/")).
-
-inserter(Tab,{Ks,V}) ->
-  K = key_e2i(i,Ks),
-  case ets:insert_new(Tab,{K,V}) of
-    false-> throw({409,{exists,Tab,K}});
-    true -> true
-  end.
-
-size_getter([])   -> [];
-size_getter(Tabs) -> {[{T,ets:info(T,size)} || T <- Tabs]}.
-
-key_getter(Tab) ->
-  ets:foldr(fun({K,_},A) -> [key_i2e(K)|A] end,[],Tab).
-
-next(Tab,Key) -> nextprev(next,Tab,Key).
-prev(Tab,Key) -> nextprev(prev,Tab,Key).
-
-nextprev(OP,Tab,Key) ->
-  case ets:lookup(Tab,ets:OP(Tab,Key)) of
-    [{K,V}] -> {[{key_i2e(K),V}]};
-    []      -> throw({409,end_of_table})
-  end.
-
-deleter(Tab,Key) ->
-  case ets:lookup(Tab,Key) of
-    []        -> null;
-    [{Key,V}] -> ets:delete(Tab,Key),V
-  end.
-
-getter(single,Tab,Key) ->
-  case getter(multi,Tab,Key) of
-    {[{_,V}]} -> V;
-    _         -> throw({404,multiple_hits})
-  end;
-getter(multi,Tab,Key) ->
-  case ets:select(Tab,[{{Key,'_'},[],['$_']}]) of
-    []   -> throw({404,no_such_key});
-    Hits -> {lists:map(fun({K,V}) -> {key_i2e(K),V} end,Hits)}
-  end.
-
-update_counter(Tab,Key,Incr) ->
-  try ets:update_counter(Tab,Key,Incr)
-  catch _:_ -> reset_counter(Tab,Key,Incr)
-  end.
-
-reset_counter(Tab,Key,Beg) ->
-  ets:insert(Tab,{Key,Beg}),
-  Beg.
-
-%% key handling
-%% the external form of a key is the path part of an url, basically
-%% any number of slash-separated elements, each of which is
-%% string() | number(), like;
-%%  "a/ddd/b/a_b_/1/3.14/x"
-%% an element can not be a single underscore, "_". the single underscore
-%% is used as a wildcard in lookups.
-%% the internal representation is a tuple of string binaries;
-%%  {<<"a">>,<<"ddd">>,<<"b">>,<<"a_b_">>,<<"1">>,<<"3.14">>,<<"x">>}
-
-%% transform key, external to internal. there are two styles;
-%% "i", for inserts/deletes; "_" is forbidden
-%% "l", for lookups; "_" is a wildcard
-key_e2i(Style,L) -> list_to_tuple([elem(Style,E) || E <- L]).
-
-elem(i,"_") -> throw({404,key_has_underscore});
-elem(l,"_") -> '_';
-elem(_,E)   -> l2b(E).
-
-%% transform key, internal to external.
-key_i2e(T) ->
-  l2b(join(tuple_to_list(T),<<"/">>)).
-
-join([E],_) -> [E];
-join([E|R],D) -> [E,D|join(R,D)].
-
-%% table names
-tab(L) ->
+chk_uri([<<>>]) ->
+  [];
+chk_uri(URI) ->
   try
-    T = list_to_existing_atom(L),
-    true = is_integer(ets:info(T,size)),
-    T
+    [lists:map(fun good_char/1,binary_to_list(E)) || E <- URI]
   catch
-    _:_ -> throw({404,no_such_table})
+    throw:{bad_char,C} -> {bad_char,{[C]}}
   end.
 
-gcall(What) ->
-  gen_server:call(rets_tables,What).
+%%ALPHA / DIGIT / "-" / "." / "_" / "~"
+-define(is_good(C),
+        (($A=<C andalso C=<$Z)
+         orelse ($a=<C andalso C=<$z)
+         orelse ($0=<C andalso C=<$9)
+         orelse (C=:=$-)
+         orelse (C=:=$.)
+         orelse (C=:=$_)
+         orelse (C=:=$~))).
+good_char(C) when ?is_good(C) -> C;
+good_char(C) -> throw({bad_char,C}).
+
+rets_headers(Req) ->
+  {Headers,_}= cowboy_req:headers(Req),
+  case proplists:get_value(<<"rets">>,Headers) of
+    undefined  -> [];
+    RetsHeader -> string:tokens(binary_to_list(RetsHeader),",")
+  end.
 
 flat(Term) ->
   lists:flatten(io_lib:fwrite("~p",[Term])).
-
-l2b(L) ->
-  list_to_binary(L).
 
 %% a nif that throws? insanity.
 jd(Term) ->
@@ -222,14 +162,20 @@ je(Term) ->
   catch {error,R} -> error({R,Term})
   end.
 
-%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% eunit
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-t00_test() ->
-  restart_rets(),
+t00_ets_test()     -> t00(ets).
+t00_leveldb_test() -> t00(leveldb).
+t00(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,false},
+               rets_client:delete(localhost,tibbe)),
   ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,false},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
                rets_client:post(localhost,tibbe,
@@ -238,11 +184,21 @@ t00_test() ->
                                  {ccc,123.1},
                                  {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
   ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,"aaa/_/x")),
-  ?assertEqual({200,["bbb","ccc","ddd","aaa/1/x"]},
+               rets_client:get(localhost,tibbe,"aaa/./x")),
+  ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
+               rets_client:get(localhost,tibbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tabbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tabbe,a,b)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tobbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tobbe,a,b)),
+  ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,'_/1/_')),
+               rets_client:get(localhost,tibbe,'./1/.')),
   ?assertEqual({200,"bBbB"},
                rets_client:get(localhost,tibbe,bbb)),
   ?assertEqual({200,123.1},
@@ -250,8 +206,10 @@ t00_test() ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,"ddd")).
 
-t01_test() ->
-  restart_rets(),
+t01_ets_test()     -> t01(ets).
+t01_leveldb_test() -> t01(leveldb).
+t01(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -263,9 +221,9 @@ t01_test() ->
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'aaa/_/x')),
+               rets_client:get(localhost,tibbe,'aaa/./x')),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'_/1/_')),
+               rets_client:get(localhost,tibbe,'./1/.')),
   ?assertEqual({200,"AAA"},
                rets_client:get(localhost,tibbe,'aaa/1/x')),
   ?assertEqual({200,"bBbB"},
@@ -275,8 +233,10 @@ t01_test() ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,ddd)).
 
-t02_test() ->
-  restart_rets(),
+t02_ets_test()     -> t02(ets).
+t02_leveldb_test() -> t02(leveldb).
+t02(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -288,8 +248,10 @@ t02_test() ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,ddd)).
 
-t03_test() ->
-  restart_rets(),
+t03_ets_test()     -> t03(ets).
+t03_leveldb_test() -> t03(leveldb).
+t03(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,1},
@@ -303,28 +265,48 @@ t03_test() ->
   ?assertEqual({200,1},
                rets_client:put(localhost,tibbe,bbb,counter)).
 
-t04_test() ->
-  restart_rets(),
+t04_ets_test()     -> t04(ets).
+t04_leveldb_test() -> t04(leveldb).
+t04(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,[]},
                rets_client:get(localhost)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,[{tibbe,0}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tabbe)),
+  ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,true},
+               rets_client:post(localhost,tibbe,[{foo,17}])),
+  ?assertEqual({200,[{tabbe,0},{tibbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,true},
+               rets_client:delete(localhost,tibbe,foo)),
+  ?assertEqual({200,true},
+               rets_client:delete(localhost,tibbe,foo)),
+  ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
                rets_client:get(localhost)).
 
-t05_test() ->
-  restart_rets(),
+t05_ets_test()     -> t05(ets).
+t05_leveldb_test() -> t05(leveldb).
+t05(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,17,foo)),
+               rets_client:put(localhost,tibbe,foo,17)),
   ?assertEqual({200,[{tibbe,1}]},
                rets_client:get(localhost)),
   ?assertMatch({409,_},
-               rets_client:put(localhost,tibbe,17,a)).
+               rets_client:put(localhost,tibbe,foo,a)).
 
-t06_test() ->
-  restart_rets(),
+t06_ets_test()     -> t06(ets).
+t06_leveldb_test() -> t06(leveldb).
+t06(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -344,8 +326,10 @@ t06_test() ->
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)).
 
-t07_test() ->
-  restart_rets(),
+t07_ets_test()     -> t07(ets).
+t07_leveldb_test() -> t07(leveldb).
+t07(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -357,9 +341,9 @@ t07_test() ->
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,'a/2/x',segundo)),
   ?assertEqual({200,"segundo"},
-               rets_client:get(localhost,tibbe,'a/_/_')),
-  ?assertEqual({404,"key_has_underscore"},
-               rets_client:put(localhost,tibbe,'a/_/_',s)),
+               rets_client:get(localhost,tibbe,'a/./.')),
+  ?assertEqual({404,"key_element_is_period"},
+               rets_client:put(localhost,tibbe,'a/./.',s)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,'a/1/x',primo)),
   ?assertEqual({404,"no_such_key"},
@@ -369,15 +353,17 @@ t07_test() ->
   ?assertEqual({200,1},
                rets_client:get(localhost,tibbe,'a')),
   ?assertEqual({404,"multiple_hits"},
-               rets_client:get(localhost,tibbe,'a/_/_')),
+               rets_client:get(localhost,tibbe,'a/./.')),
   ?assertEqual({200,[{"a/1/x","primo"},{"a/2/x","segundo"}]},
-               rets_client:get(localhost,tibbe,'a/_/_',multi)),
+               rets_client:get(localhost,tibbe,'a/./.',multi)),
   ?assertEqual({404,"no_such_key"},
-               rets_client:get(localhost,tibbe,'b/_/_',multi)).
+               rets_client:get(localhost,tibbe,'b/./.',multi)).
 
-t08_test() ->
+t08_ets_test()     -> t08(ets).
+t08_leveldb_test() -> t08(leveldb).
+t08(Backend) ->
+  restart_rets(Backend),
   T = [{"a","a"},{"b",[{"bb","bb"}]}], %% nested proplist
-  restart_rets(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tybbe)),
   ?assertEqual({200,true},
@@ -385,10 +371,16 @@ t08_test() ->
   ?assertMatch({200,T},
                rets_client:get(localhost,tybbe,"abc")).
 
-t09_test() ->
-  restart_rets(),
+t09_ets_test()     -> t09(ets).
+t09_leveldb_test() -> t09(leveldb).
+t09(Backend) ->
+  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,0,next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,0,prev)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe,a,1)),
   ?assertEqual({200,1},
@@ -398,24 +390,23 @@ t09_test() ->
   ?assertEqual({409,"end_of_table"},
                rets_client:get(localhost,tebbe,a,prev)),
   ?assertEqual({200,[{"a",1}]},
+               rets_client:get(localhost,tebbe,b,prev)),
+  ?assertEqual({200,[{"a",1}]},
                rets_client:get(localhost,tebbe,0,next)).
 
-restart_rets() ->
-  application:stop(inets),
+restart_rets(Backend) ->
   application:stop(rets),
-  application:stop(cowboy),
-  application:stop(ranch),
-  start_and_wait().
+  start_and_wait(Backend).
 
-start_and_wait() ->
+start_and_wait(Backend) ->
   receive after 200 -> ok end,
-  case start() of
+  case start(Backend) of
     {ok,_} ->
       wait_for_start();
-    _ ->
-      erlang:display(waiting_for_shutdown),
+    R ->
+      erlang:display({waiting_for_shutdown,R}),
       receive after 200 -> ok end,
-      start_and_wait()
+      start_and_wait(Backend)
   end.
 
 wait_for_start() ->

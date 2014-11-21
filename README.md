@@ -3,8 +3,8 @@
 
 **rets** is a CRUD service, providing network access to a simple key/value
 store.
-Clients can use REST-style HTTP to read, write and delete simple tables,
-and rows in the tables.
+
+## EXAMPLES
 
 Start like this;
 ```
@@ -29,12 +29,12 @@ curl localhost:7890/tabbe/bjorn
 
 Get next (lexically sorted) row
 ```
-curl -H "next:true" localhost:7890/tabbe/0
+curl -H "rets:next" localhost:7890/tabbe/0
 ```
 
 Get previous (lexically sorted) row
 ```
-curl -H "prev:true" localhost:7890/tabbe/x
+curl -H "rets:prev" localhost:7890/tabbe/x
 ```
 
 Get all keys in a table;

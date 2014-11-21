@@ -11,15 +11,21 @@
 
 start(_StartType, _StartArgs) ->
   start_cowboy_instance(),
-  rets_sup:start_link().
+  rets_sup:start_link([application:get_all_env(rets)]).
 
 stop(_State) ->
   ok.
 
 start_cowboy_instance() ->
+  case start_cowboy() of
+    {error,{already_started,_}} -> ok;
+    {ok,_} -> ok
+  end.
+
+start_cowboy() ->
   Opts = rets:cowboy_opts(),
   Dispatch = cowboy_router:compile(proplists:get_value(routes,Opts)),
-  {ok,_} = cowboy:start_http(proplists:get_value(name,Opts),
-                             proplists:get_value(acceptors,Opts),
-                             proplists:get_value(opts,Opts),
-                             [{env,[{dispatch,Dispatch}]}]).
+  cowboy:start_http(proplists:get_value(name,Opts),
+                    proplists:get_value(acceptors,Opts),
+                    proplists:get_value(opts,Opts),
+                    [{env,[{dispatch,Dispatch}]}]).
