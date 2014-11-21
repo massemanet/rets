@@ -283,9 +283,9 @@ t04(Backend) ->
                rets_client:post(localhost,tibbe,[{foo,17}])),
   ?assertEqual({200,[{tabbe,0},{tibbe,1}]},
                rets_client:get(localhost)),
-  ?assertEqual({200,true},
+  ?assertEqual({200,17},
                rets_client:delete(localhost,tibbe,foo)),
-  ?assertEqual({200,true},
+  ?assertEqual({200,null},
                rets_client:delete(localhost,tibbe,foo)),
   ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
                rets_client:get(localhost)).

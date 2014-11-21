@@ -92,7 +92,10 @@ getter(multi,Tab,Key) ->
   end.
 
 deleter(Tab,Key) ->
-  ets:delete(Tab,Key).
+  case ets:lookup(Tab,Key) of
+    []        -> null;
+    [{Key,V}] -> ets:delete(Tab,Key),V
+  end.
 
 update_counter(Tab,Key,Incr) ->
   try ets:update_counter(Tab,Key,Incr)

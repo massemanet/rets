@@ -103,7 +103,7 @@ fold_loop(TK,Tab,Iter,Fun,Acc) ->
 update_counter(S,Tab,Key,Incr) ->
   case lvl_get(S,tk(Tab,Key)) of
     not_found -> ins_overwrite(S,Tab,Key,Incr);
-    Val       -> ins_overwrite(S,Tab,Key,unpack_val(Val)+Incr)
+    Val       -> ins_overwrite(S,Tab,Key,Val+Incr)
   end.
 
 reset_counter(S,Tab,Key,Val) ->
@@ -123,8 +123,8 @@ ins_ifempty(S,Tab,Key,Val) ->
     not_found ->
       ets:update_counter(leveldb_tabs,Tab,1),
       do_ins(S,TK,Val);
-    X ->
-      throw({409,{key_exists,{Tab,Key,X}}})
+    Vl ->
+      throw({409,{key_exists,{Tab,Key,Vl}}})
   end.
 
 ins_overwrite(S,Tab,Key,Val) ->
@@ -154,7 +154,7 @@ getter(S,multi,Tab,Ekey) ->
         As -> {As}
       end;
     Val ->
-      {[{list_to_binary(string:join(Ekey,"/")),unpack_val(Val)}]}
+      {[{list_to_binary(string:join(Ekey,"/")),Val}]}
   end.
 
 next(S,TK,WKey,Acc) ->
@@ -202,10 +202,12 @@ check_np(_,{TK,V},_,_) ->
 deleter(S,Tab,Key) ->
   TK = tk(Tab,Key),
   case lvl_get(S,TK) of
-    not_found -> true;
-    _ ->
+    not_found ->
+      null;
+    Val ->
+      lvl_delete(S,tk(Tab,Key)),
       ets:update_counter(leveldb_tabs,Tab,-1),
-      lvl_delete(S,tk(Tab,Key))
+      Val
   end.
 
 %% data packing
@@ -275,7 +277,7 @@ lvl_mv_iter(Iter,Where) ->
 
 lvl_get(S,Key) ->
   case eleveldb:get(S#state.handle,Key,[]) of
-    {ok,Val}    -> Val;
+    {ok,V}      -> unpack_val(V);
     not_found   -> not_found;
     {error,Err} -> throw({500,{get_error,Err}})
   end.
