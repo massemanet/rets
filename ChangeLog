@@ -1,9 +1,26 @@
-commit 7a82fb2c127e645ef7a90d94e94e4003e69b3194
+commit 317992ee23cdbbbeafa804e4d1259a3142c8f9ab
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 10:50:10 2014 +0100
+
+    v0.8.2
+
+src/rets.app.src
+
+commit bfc66564e5b19f39898c5308f95ebf0b81884683
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 10:49:38 2014 +0100
+
+    fix release script
+
+bin/release.sh
+
+commit 24d6bfa53453c8fc766f59ef4231616d5a7ae925
 Author: mats cronqvist <masse@klarna.com>
 Date:   Mon Nov 24 10:16:53 2014 +0100
 
     remove some dead code
 
+ChangeLog
 Makefile
 src/rets.erl
 src/rets_app.erl
