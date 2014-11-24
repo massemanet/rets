@@ -17,10 +17,7 @@ stop(_State) ->
   ok.
 
 start_cowboy_instance() ->
-  case start_cowboy() of
-    {error,{already_started,_}} -> ok;
-    {ok,_} -> ok
-  end.
+  start_cowboy().
 
 start_cowboy() ->
   Opts = rets:cowboy_opts(),

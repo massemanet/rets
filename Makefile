@@ -59,8 +59,8 @@ xref: compile-all
                   eunit xmerl compiler runtime_tools mnesia
 
 deps/.dialyzer_plt: ~/.dialyzer_plt
-	dialyzer --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
+	-dialyzer --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
 
-dialyze: ~/.dialyzer_plt
+dialyze: deps/.dialyzer_plt
 	$(shell [ -d .eunit ] && rm -rf .eunit)
 	dialyzer ebin -nn --plt deps/.dialyzer_plt

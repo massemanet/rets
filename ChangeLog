@@ -1,9 +1,83 @@
-commit f9bd7f22c9dcaad524bea7d34322028d6dd5bd87
+commit 7a82fb2c127e645ef7a90d94e94e4003e69b3194
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 10:16:53 2014 +0100
+
+    remove some dead code
+
+Makefile
+src/rets.erl
+src/rets_app.erl
+
+commit 1171b81392fbe55228c16211731add572430d1d3
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Nov 21 16:55:28 2014 +0100
+
+    make delete return oldval|null [regression]
+
+src/rets.erl
+src/rets_ets.erl
+src/rets_leveldb.erl
+
+commit e938d0bec4a8e12e3d11a0aca99f8b1fbd499753
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Nov 21 16:28:43 2014 +0100
+
+    leveldb backend
+
+Makefile
+README.md
+bin/release.sh
+bin/rets.sh
+rebar
+rebar.config
+src/rets.erl
+src/rets_app.erl
+src/rets_client.erl
+src/rets_ets.erl
+src/rets_handler.erl
+src/rets_leveldb.erl
+src/rets_sup.erl
+src/rets_tables.erl
+
+commit 4fc2ea0c8b6e3ab520d6edc8f7c152e45f9980da
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 13 15:19:07 2014 +0100
+
+    pimped Makefile
+
+Makefile
+
+commit 1106ca9123f55e1b131ac4506438a3dc373ee709
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 13 15:11:07 2014 +0100
+
+    cosmetic
+
+src/rets.erl
+
+commit 355113e4bf74ad3b370d3abbed3327a893a8ab8b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 13 15:10:19 2014 +0100
+
+    make delete return the old value
+
+src/rets.erl
+
+commit a4528ddb3c02f68593ecce6359ea4ef6a5bf9135
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Oct 9 11:12:58 2014 +0200
+
+    docs
+
+README.md
+
+commit 9e19cb4f595f7b2fc40bb49b0aaeffcfe244f2da
 Author: mats cronqvist <masse@klarna.com>
 Date:   Wed Oct 8 21:31:27 2014 +0200
 
     v0.8.0
 
+ChangeLog
 src/rets.app.src
 
 commit fba23fc0f7b708aa3d5cd231e434487e859c177c

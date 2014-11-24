@@ -396,25 +396,6 @@ t09(Backend) ->
 
 restart_rets(Backend) ->
   application:stop(rets),
-  start_and_wait(Backend).
+  {ok,_} = start(Backend).
 
-start_and_wait(Backend) ->
-  receive after 200 -> ok end,
-  case start(Backend) of
-    {ok,_} ->
-      wait_for_start();
-    R ->
-      erlang:display({waiting_for_shutdown,R}),
-      receive after 200 -> ok end,
-      start_and_wait(Backend)
-  end.
-
-wait_for_start() ->
-  case supervisor:which_children(ranch_sup) of
-    [{{_,rets_listener},_,_,[_]}|_] -> ok;
-    R ->
-      erlang:display({waiting_for_startup,R}),
-      receive after 200 -> ok end,
-      wait_for_start()
-  end.
 -endif. % TEST
