@@ -5,10 +5,12 @@ function usage () {
     exit
 }
 
+APPSRC=`echo $PWD/src/*.app.src`
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 TAG=$(git name-rev --tags --name-only $(git rev-parse HEAD))
 OVSN=$(git describe | cut -f1 -d"-")
 
+[ -f $APPSRC ]            || usage "No .app.src file"
 [ "$BRANCH" != "master" ] && usage "Not on master"
 [ "$TAG" != "undefined" ] && usage "Already tagged"
 [ "$OVSN" = "" ]          && usage "No old version"
@@ -33,7 +35,7 @@ else
 fi
 echo $OVSN"->"$NVSN
 
-sed  s/$OVSN/$NVSN/ < $APPSRC > $$ && mv $$ $APPSRC
+sed  "s/[0-9]\.[0-9]\.[0-9]/$NVSN/" < $APPSRC > $$ && mv $$ $APPSRC
 git add $APPSRC
 git commit -m"v$NVSN"
 git log --name-only --no-merges | grep -Ev '^[ ]+$$|git-svn-id' > ChangeLog
