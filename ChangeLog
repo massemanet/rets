@@ -1,9 +1,26 @@
-commit 317992ee23cdbbbeafa804e4d1259a3142c8f9ab
+commit b6376e3b7e5ba3bdef975579a18028f59a1e9bba
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 10:59:59 2014 +0100
+
+    v0.8.3
+
+src/rets.app.src
+
+commit 382568b633539547aac11dbf195c5c5d879276b4
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 10:59:19 2014 +0100
+
+    make make dialyze continue after errors
+
+Makefile
+
+commit 4f0c442563e9615744aad35a8221b6d9a97b22fa
 Author: mats cronqvist <masse@klarna.com>
 Date:   Mon Nov 24 10:50:10 2014 +0100
 
     v0.8.2
 
+ChangeLog
 src/rets.app.src
 
 commit bfc66564e5b19f39898c5308f95ebf0b81884683
