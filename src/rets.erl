@@ -12,7 +12,8 @@
 
 -export([start/1]).       % interactive start, with backend choice
 
--behavior(cowboy_http_handler).
+%% should say "-behavior(cowboy_http_handler)." here, but rebar freaks out
+
 -export([handle/2,
          init/3,
          terminate/3]).
