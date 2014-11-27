@@ -1,9 +1,34 @@
-commit b6376e3b7e5ba3bdef975579a18028f59a1e9bba
+commit 67e1db11fe0deb2966cbefe7936893d25aaed71a
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 27 15:13:30 2014 +0100
+
+    v0.8.4
+
+src/rets.app.src
+
+commit 4ded98d22a651cea14c82eab96d09974ff47ff94
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 27 12:07:54 2014 +0100
+
+    fix for rebar whiff
+
+src/rets.erl
+
+commit 2cc72684b357d8b1944c481095b8ea3671991b5f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Nov 24 11:54:02 2014 +0100
+
+    include syntax_tools in dialyzation
+
+Makefile
+
+commit db84c9e8878973702b6ae2660a753abd9cecf69d
 Author: mats cronqvist <masse@klarna.com>
 Date:   Mon Nov 24 10:59:59 2014 +0100
 
     v0.8.3
 
+ChangeLog
 src/rets.app.src
 
 commit 382568b633539547aac11dbf195c5c5d879276b4

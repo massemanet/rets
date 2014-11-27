@@ -2,7 +2,7 @@
 {application, rets,
  [
   {description, "rest wrapper around ets"},
-  {vsn, "0.8.3"},
+  {vsn, "0.8.4"},
   {registered, []},
   {applications, [
                   cowboy,
