@@ -74,21 +74,28 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("PUT",   [Tab]    ,[],_)          -> g({create,[Tab]});
-x("PUT",   [Tab|Key],[],R)          -> g({insert,[Tab,chkk(Key),body(R)]});
-x("PUT",   [Tab|Key],["counter"],_) -> g({bump,  [Tab,chkk(Key),1]});
-x("PUT",   [Tab|Key],["reset"],_)   -> g({reset, [Tab,chkk(Key),0]});
-x("GET",   []       ,[],_)          -> g({sizes, []});
-x("GET",   [Tab]    ,[],_)          -> g({keys,  [Tab]});
-x("GET",   [Tab|Key],[],_)          -> g({single,[Tab,Key]});
-x("GET",   [Tab|Key],["multi"],_)   -> g({multi, [Tab,Key]});
-x("GET",   [Tab|Key],["next"],_)    -> g({next,  [Tab,Key]});
-x("GET",   [Tab|Key],["prev"],_)    -> g({prev,  [Tab,Key]});
-x("POST",  [Tab]    ,[],R)          -> g({insert,[Tab,chkb(body(R))]});
-x("DELETE",[Tab]    ,[],_)          -> g({delete,[Tab]});
-x("DELETE",[Tab|Key],[],_)          -> g({delete,[Tab,Key]});
-x("TRACE",_,_,_)                    -> throw({405,"method not allowed"});
-x(Meth,URI,Headers,Bdy)             -> throw({404,{Meth,URI,Headers,Bdy}}).
+x("GET",   [KeyW],["gauge"],_) -> g({gauge,    [KeyW]});
+x("GET",   [KeyW],["keys"],_)  -> g({keys,     [KeyW]});
+x("GET",   [KeyW],["next"],_)  -> g({next,     [KeyW]});
+x("GET",   [KeyW],["prev"],_)  -> g({prev,     [KeyW]});
+x("GET",   [KeyW],["multi"],_) -> g({multi,    [KeyW]});
+x("GET",   [KeyW],_,_)         -> g({single,   [KeyW]});
+x("GET",   [],[],R)            -> g({read_ops, [chkb(body(R))]});
+
+x("PUT",   [Key], ["gauge"],_) -> g({mk_gauge, [Key]});
+x("PUT",   [Key], ["force"],R) -> g({force_ins,[chkk(Key),body(R)]});
+x("PUT",   [Key], [],R)        -> g({insert,   [chkk(Key),body(R)]});
+x("PUT",   [Key], ["bump"],_)  -> g({bump,     [chkk(Key),1]});
+x("PUT",   [Key], ["reset"],_) -> g({reset,    [chkk(Key),0]});
+
+x("POST",  []   , [],R)        -> g({write_ops,[chkb(body(R))]});
+
+x("DELETE",[Key], ["gauge"],_) -> g({del_gauge,[Key]});
+x("DELETE",[Key], ["force"],_) -> g({force_del,[Key]});
+x("DELETE",[Key], [],R)        -> g({delete,   [Key,body(R)]});
+
+x("TRACE",_,_,_)               -> throw({405,"method not allowed"});
+x(Meth,URI,Headers,_)          -> throw({404,{Meth,URI,Headers}}).
 
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
@@ -132,7 +139,8 @@ chk_uri(URI) ->
     throw:{bad_char,C} -> {bad_char,{[C]}}
   end.
 
-%%ALPHA / DIGIT / "-" / "." / "_" / "~"
+%% rfc 3986
+%% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
 -define(is_good(C),
         (($A=<C andalso C=<$Z)
          orelse ($a=<C andalso C=<$z)
