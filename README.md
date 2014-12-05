@@ -21,29 +21,35 @@ Counters are special integer values, handled through the "counter" and
 "reset" operations.
 
 Method  URL   Header   Body      Action                  On success, returns
-PUT     Key                      create size counter     null|OldVal
-PUT     Key            Val       insert Key/Val          Val
-PUT     Key   counter            bump Val by one         NewInt=OldInt+1
-PUT     Key   reset              reset Val to zero       OldInt
-
-GET     KeyW  sizes              get all sizes           {Key:Size}
+GET     KeyW  gauge              get all matching gauges [{Key,Size}]
 GET     KeyW  keys               get all matching keys   [Key]
 GET     KeyW  single             succeeds iff 1 Key      Val
-GET     KeyW  multi              multi read Key          {Key,Val}
+GET     KeyW  multi              multi read Key          [{Key,Val}]
 GET     KeyW  next               next                    {NextKey,NextVal}
 GET     KeyW  prev               prev                    {PrevKey,PrevVal}
+GET                    [ReadOp]  read many keys          [{Key,Val}]
 
-DELETE  KeyW                     delete Key              null|{Key,Value}
-DELETE  KeyW           Val       delete Key iff Key/Val  null
+PUT     Key   gauge              create gauge            null|OldVal
+PUT     Key   force    Val       insert Key/Val          OldVal
+PUT     Key            [NV,OV]   ins Key/NV iff Key/OV   OldVal
+PUT     Key   bump               bump Val by one         NewInt=OldInt+1
+PUT     Key   reset              reset Val to zero       OldInt
 
-POST                   [Op]      perform ops             null
+POST                   [WriteOp] mutate Keys             null
+
+DELETE  Key   gauge              delete gauge on Key     null|Value
+DELETE  Key   force              delete Key              null|Value
+DELETE  Key            Val       delete Key iff Key/Val  null
 
   Key is a string, consisting of "/"-separated Elements
-  Element is a non-empty string with characters from the set "a-zA-Z0-9-"
-  KeyW is a key where at least one Element is an "_"
+  Element is a non-empty string with characters from the set "a-zA-Z0-9-_.~"
+  Element can not be "."
+  KeyW is a string, consisting of "/"-separated Element | ".". The single
+  period is a wildcard, and matches any Element
   Val is a JSON object
-  Op is; {delete,Key} | {delete,Key,OldVal} |
-         {insert,Key,Val} | {insert,Key,Val,OldVal}
+  WriteOp is; ["delete",Key] | ["delete",Key,OldVal] |
+              ["insert",Key,Val] | ["insert",Key,Val,OldVal]
+  ReadOp is; ["single",KeyW] | ["multi",KeyW]
 
 ## EXAMPLES
 
