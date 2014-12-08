@@ -8,25 +8,32 @@
 -author('Mats Cronqvist').
 -export([init/1,
          terminate/1,
-         create/2,
-         delete/2,
-         sizes/2,
-         keys/2,
-         insert/2,
-         bump/2,
-         reset/2,
+         %% GET
          next/2,
          prev/2,
          multi/2,
-         single/2]).
+         single/2,
+         %% PUT
+         mk_gauge/2,
+         force_ins/2,
+         insert/2,
+         bump/2,
+         reset/2,
+         %% POST
+         write_ops/2,
+         read_ops/2,
+         %% DELETE
+         del_gauge/2,
+         force_del/2,
+         delete/2
+         ]).
 
 -record(state,
-        {tables=[],
-         handle,
+        {handle,
          dir}).
 
 init(Env) ->
-  ets:new(leveldb_tabs,[ordered_set,named_table,public]),
+  ets:new(leveldb_gauges,[ordered_set,named_table,public]),
   Dir = proplists:get_value(table_dir,Env,"/tmp/rets/leveldb"),
   filelib:ensure_dir(Dir),
   #state{handle = lvl_open(Dir),
@@ -54,36 +61,94 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])       -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])       -> {delete(tab_name(Tab)),S};
-delete(S ,[Tab,Key])   -> {deleter(S,tab(Tab),Key),S}.
-sizes(S  ,[])          -> {siz(),S}.
-keys(S   ,[Tab])       -> {key_getter(S,tab(Tab)),S}.
-insert(S ,[Tab,KVs])   -> {ins(S,tab(Tab),KVs),S};
-insert(S ,[Tab,K,V])   -> {ins(S,tab(Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I]) -> {update_counter(S,tab(Tab),Key,I),S}.
-reset(S  ,[Tab,Key,I]) -> {reset_counter(S,tab(Tab),Key,I),S}.
-next(S   ,[Tab,Key])   -> {nextprev(S,next,tab(Tab),Key),S}.
-prev(S   ,[Tab,Key])   -> {nextprev(S,prev,tab(Tab),Key),S}.
-multi(S  ,[Tab,Key])   -> {getter(S,multi,tab(Tab),Key),S}.
-single(S ,[Tab,Key])   -> {getter(S,single,tab(Tab),Key),S}.
+%% GET
+next     (S,[Key])     -> nextprev(S,next,Key).
+prev     (S,[Key])     -> nextprev(S,prev,Key).
+multi    (S,[Key])     -> getter(S,multi ,Key).
+single   (S,[Key])     -> getter(S,single,Key).
+%% PUT
+mk_gauge (_,[Key])     -> Key.
+force_ins(_,[Key,Val]) -> {[Key,Val]}.
+insert   (S,[Key,V])   -> ins(S,[{K,V}]).
+bump     (S,[Key,I])   -> update_counter(S,Key,I).
+reset    (S,[Key,I])   -> reset_counter(S,Key,I).
+%% POST
+write_ops(S,[Wops])    -> wops(S,Wops).
+read_ops (S,[Rops])    -> rops(S,Rops).
+%% DELETE
+del_gauge(_,Key)       -> Key.
+force_del(S,Key)       -> delete(S,[Key,null]).
+delete   (S,[Key,Val]) -> deleter(S,Key,OldVal).
 
-create(Tab) ->
-  case ets:lookup(leveldb_tabs,Tab) of
-    [{Tab,_Size}] -> false;
-    []            -> ets:insert(leveldb_tabs,{Tab,0}),true
+%% get data from leveldb.
+nextprev(S,OP,Key) ->
+  case nextprev(S,{OP,Key}) of
+    end_of_table -> throw({409,end_of_table});
+    {K,V}        -> {[{K,unpack_val(V)}]}
   end.
 
-delete(Tab) ->
-  case ets:lookup(leveldb_tabs,Tab) of
-    [{Tab,_Size}] -> ets:delete(leveldb_tabs,Tab),true;
-    []            -> false
+nextprev(S,{OP,Key}) ->
+  Iter = lvl_iter(S,key_vals),
+  check_np(OP,lvl_mv_iter(Iter,Key),Iter,Key).
+
+check_np(prev,invalid_iterator,Iter,Key) ->
+  case lvl_mv_iter(Iter,last) of
+    invalid_iterator -> throw({409,end_of_table});
+    {LastKey,Val} ->
+      case LastKey < Key of
+        true -> check_np(prev,{LastKey,Val},Iter,Key);
+        false-> check_np(next,invalid_iterator,Iter,Key)
+      end
+  end;
+check_np(_,invalid_iterator,_,_) ->
+  end_of_table;
+check_np(OP,{Key,_},Iter,Key) ->
+  check_np(OP,lvl_mv_iter(Iter,OP),Iter,Key);
+check_np(_,{Key,V},_,_) ->
+  {Key,V}.
+
+%% allow wildcards (".") in keys
+getter(S,single,Ekey) ->
+  case getter(S,multi,Ekey) of
+    {[{_,V}]} -> V;
+    _         -> throw({404,multiple_hits})
+  end;
+getter(S,multi,Ekey) ->
+  case lvl_get(S,Ekey) of
+    not_found ->
+      case next(S,Ekey,[]) of
+        [] -> throw({404,no_such_key});
+        As -> {As}
+      end;
+    Val ->
+      {[{list_to_binary(string:join(Ekey,"/")),Val}]}
   end.
 
-siz() ->
-  case ets:tab2list(leveldb_tabs) of
-    [] -> [];
-    TS -> {[{list_to_atom(tab_unname(T)),S} || {T,S} <- TS]}
+next(S,TK,WKey,Acc) ->
+  case nextprev(S,next,TK) of
+    end_of_table -> lists:reverse(Acc);
+    {NewTK,V} ->
+      Key = tk_key(NewTK),
+      case key_match(WKey,mk_ekey(Key)) of
+        true -> next(S,NewTK,WKey,[{Key,unpack_val(V)}|Acc]);
+        false-> Acc
+      end
+  end.
+
+key_match([],[])               -> true;
+key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
+key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
+key_match(_,_)                 -> false.
+
+deleter(S,Tab,Key) ->
+  TK = tk(Tab,Key),
+  case lvl_get(S,TK) of
+    not_found ->
+      null;
+    Val ->
+      lvl_delete(S,tk(Tab,Key)),
+      ets:update_counter(leveldb_tabs,Tab,-1),
+      Val
   end.
 
 key_getter(S,Tab) ->
@@ -138,77 +203,6 @@ ins_overwrite(S,Tab,Key,Val) ->
 do_ins(S,TK,Val) ->
   lvl_put(S,TK,pack_val(Val)),
   Val.
-
-%% get data from leveldb.
-%% allow wildcards (".") in keys
-getter(S,single,Tab,Ekey) ->
-  case getter(S,multi,Tab,Ekey) of
-    {[{_,V}]} -> V;
-    _         -> throw({404,multiple_hits})
-  end;
-getter(S,multi,Tab,Ekey) ->
-  case lvl_get(S,tk(Tab,Ekey)) of
-    not_found ->
-      case next(S,tk(Tab,Ekey),Ekey,[]) of
-        [] -> throw({404,no_such_key});
-        As -> {As}
-      end;
-    Val ->
-      {[{list_to_binary(string:join(Ekey,"/")),Val}]}
-  end.
-
-next(S,TK,WKey,Acc) ->
-  case nextprev(S,next,TK) of
-    end_of_table -> lists:reverse(Acc);
-    {NewTK,V} ->
-      Key = tk_key(NewTK),
-      case key_match(WKey,mk_ekey(Key)) of
-        true -> next(S,NewTK,WKey,[{Key,unpack_val(V)}|Acc]);
-        false-> Acc
-      end
-  end.
-
-key_match([],[])               -> true;
-key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
-key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
-key_match(_,_)                 -> false.
-
-nextprev(S,OP,Tab,Key) ->
-  case nextprev(S,OP,tk(Tab,Key)) of
-    end_of_table -> throw({409,end_of_table});
-    {TK,V}    -> {[{tk_key(TK),unpack_val(V)}]}
-  end.
-
-nextprev(S,OP,TK) ->
-  Iter = lvl_iter(S,key_vals),
-  check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK).
-
-check_np(prev,invalid_iterator,Iter,TK) ->
-  case lvl_mv_iter(Iter,last) of
-    invalid_iterator -> throw({409,end_of_table});
-    {LastTK,Val} ->
-      case LastTK < TK of
-        true -> check_np(prev,{LastTK,Val},Iter,TK);
-        false-> check_np(next,invalid_iterator,Iter,TK)
-      end
-  end;
-check_np(_,invalid_iterator,_,_) ->
-  end_of_table;
-check_np(OP,{TK,_},Iter,TK) ->
-  check_np(OP,lvl_mv_iter(Iter,OP),Iter,TK);
-check_np(_,{TK,V},_,_) ->
-  {TK,V}.
-
-deleter(S,Tab,Key) ->
-  TK = tk(Tab,Key),
-  case lvl_get(S,TK) of
-    not_found ->
-      null;
-    Val ->
-      lvl_delete(S,tk(Tab,Key)),
-      ets:update_counter(leveldb_tabs,Tab,-1),
-      Val
-  end.
 
 %% data packing
 pack_val(Val) ->

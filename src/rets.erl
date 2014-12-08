@@ -74,28 +74,28 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("GET",   [KeyW],["gauge"],_) -> g({gauge,    [KeyW]});
-x("GET",   [KeyW],["keys"],_)  -> g({keys,     [KeyW]});
-x("GET",   [KeyW],["next"],_)  -> g({next,     [KeyW]});
-x("GET",   [KeyW],["prev"],_)  -> g({prev,     [KeyW]});
-x("GET",   [KeyW],["multi"],_) -> g({multi,    [KeyW]});
-x("GET",   [KeyW],_,_)         -> g({single,   [KeyW]});
-x("GET",   [],[],R)            -> g({read_ops, [chkb(body(R))]});
+x("GET"   ,[KeyW],["gauge"],_) -> g({gauge,    [KeyW]});
+x("GET"   ,[KeyW],["keys"] ,_) -> g({keys,     [KeyW]});
+x("GET"   ,[KeyW],["next"] ,_) -> g({next,     [KeyW]});
+x("GET"   ,[KeyW],["prev"] ,_) -> g({prev,     [KeyW]});
+x("GET"   ,[KeyW],["multi"],_) -> g({multi,    [KeyW]});
+x("GET"   ,[KeyW],_        ,_) -> g({single,   [KeyW]});
 
-x("PUT",   [Key], ["gauge"],_) -> g({mk_gauge, [Key]});
-x("PUT",   [Key], ["force"],R) -> g({force_ins,[chkk(Key),body(R)]});
-x("PUT",   [Key], [],R)        -> g({insert,   [chkk(Key),body(R)]});
-x("PUT",   [Key], ["bump"],_)  -> g({bump,     [chkk(Key),1]});
-x("PUT",   [Key], ["reset"],_) -> g({reset,    [chkk(Key),0]});
+x("PUT"   ,[Key] ,["gauge"],_) -> g({mk_gauge, [Key]});
+x("PUT"   ,[Key] ,["force"],R) -> g({force_ins,[chkk(Key),body(R)]});
+x("PUT"   ,[Key] ,[]       ,R) -> g({insert,   [chkk(Key),body(R)]});
+x("PUT"   ,[Key] ,["bump"] ,_) -> g({bump,     [chkk(Key),1]});
+x("PUT"   ,[Key] ,["reset"],_) -> g({reset,    [chkk(Key),0]});
 
-x("POST",  []   , [],R)        -> g({write_ops,[chkb(body(R))]});
+x("POST"  ,[]    ,["write"],R) -> g({write_ops,[chkb(body(R))]});
+x("POST"  ,[]    ,["read"] ,R) -> g({read_ops, [chkb(body(R))]});
 
-x("DELETE",[Key], ["gauge"],_) -> g({del_gauge,[Key]});
-x("DELETE",[Key], ["force"],_) -> g({force_del,[Key]});
-x("DELETE",[Key], [],R)        -> g({delete,   [Key,body(R)]});
+x("DELETE",[Key] ,["gauge"],_) -> g({del_gauge,[Key]});
+x("DELETE",[Key] ,["force"],_) -> g({force_del,[Key]});
+x("DELETE",[Key] ,[]       ,R) -> g({delete,   [Key,body(R)]});
 
-x("TRACE",_,_,_)               -> throw({405,"method not allowed"});
-x(Meth,URI,Headers,_)          -> throw({404,{Meth,URI,Headers}}).
+x("TRACE" ,_     ,_        ,_) -> throw({405,"method not allowed"});
+x(Meth    ,URI   ,Headers  ,_) -> throw({404,{Meth,URI,Headers}}).
 
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
@@ -179,232 +179,26 @@ je(Term) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-t00_ets_test()     -> t00(ets).
+%t00_ets_test()     -> t00(ets).
 t00_leveldb_test() -> t00(leveldb).
 t00(Backend) ->
   restart_rets(Backend),
-  ?assertEqual({200,false},
-               rets_client:delete(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,false},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:post(localhost,tibbe,
+  ?assertEqual({200,null},
+               rets_client:post(localhost,
                                 [{'aaa/1/x',"AAA"++[223]},
                                  {bbb,bBbB},
                                  {ccc,123.1},
                                  {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
-  ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,"aaa/./x")),
-  ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
-               rets_client:get(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tabbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tabbe,a,b)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tobbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tobbe,a,b)),
-  ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
-               rets_client:get(localhost,tibbe)),
-  ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,'./1/.')),
-  ?assertEqual({200,"bBbB"},
-               rets_client:get(localhost,tibbe,bbb)),
-  ?assertEqual({200,123.1},
-               rets_client:get(localhost,tibbe,ccc)),
-  ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
-               rets_client:get(localhost,tibbe,"ddd")).
+  ?assertEqual({200,[{"aaa/1/x",[$A,$A,$A,223]},
+                     [$A,$A,$A,223],
+                     bBbB,
+                     [{ccc,123.1}]]},
+               rets_client:post(localhost,"",[],
+                               [{multi,'aaa/./x'},
+                                {single,'aaa/1/x'},
+                                {single,bbb},
+                                {multi,ccc}])).
 
-t01_ets_test()     -> t01(ets).
-t01_leveldb_test() -> t01(leveldb).
-t01(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,'aaa/1/x',"AAA")),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,bbb,bBbB)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,ccc,123.1)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
-  ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'aaa/./x')),
-  ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'./1/.')),
-  ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'aaa/1/x')),
-  ?assertEqual({200,"bBbB"},
-               rets_client:get(localhost,tibbe,bbb)),
-  ?assertEqual({200,123.1},
-               rets_client:get(localhost,tibbe,ccc)),
-  ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
-               rets_client:get(localhost,tibbe,ddd)).
-
-t02_ets_test()     -> t02(ets).
-t02_leveldb_test() -> t02(leveldb).
-t02(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,bbb,bBbB)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
-  ?assertEqual({200,"bBbB"},
-               rets_client:get(localhost,tibbe,bbb)),
-  ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
-               rets_client:get(localhost,tibbe,ddd)).
-
-t03_ets_test()     -> t03(ets).
-t03_leveldb_test() -> t03(leveldb).
-t03(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,1},
-               rets_client:put(localhost,tibbe,bbb,counter)),
-  ?assertEqual({200,2},
-               rets_client:put(localhost,tibbe,bbb,counter)),
-  ?assertEqual({200,2},
-               rets_client:get(localhost,tibbe,bbb)),
-  ?assertEqual({200,0},
-               rets_client:put(localhost,tibbe,bbb,reset)),
-  ?assertEqual({200,1},
-               rets_client:put(localhost,tibbe,bbb,counter)).
-
-t04_ets_test()     -> t04(ets).
-t04_leveldb_test() -> t04(leveldb).
-t04(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,[]},
-               rets_client:get(localhost)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,[{tibbe,0}]},
-               rets_client:get(localhost)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tabbe)),
-  ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
-               rets_client:get(localhost)),
-  ?assertEqual({200,true},
-               rets_client:post(localhost,tibbe,[{foo,17}])),
-  ?assertEqual({200,[{tabbe,0},{tibbe,1}]},
-               rets_client:get(localhost)),
-  ?assertEqual({200,17},
-               rets_client:delete(localhost,tibbe,foo)),
-  ?assertEqual({200,null},
-               rets_client:delete(localhost,tibbe,foo)),
-  ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
-               rets_client:get(localhost)).
-
-t05_ets_test()     -> t05(ets).
-t05_leveldb_test() -> t05(leveldb).
-t05(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,foo,17)),
-  ?assertEqual({200,[{tibbe,1}]},
-               rets_client:get(localhost)),
-  ?assertMatch({409,_},
-               rets_client:put(localhost,tibbe,foo,a)).
-
-t06_ets_test()     -> t06(ets).
-t06_leveldb_test() -> t06(leveldb).
-t06(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({404,"no_such_table"},
-               rets_client:get(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({404,"no_such_key"},
-               rets_client:get(localhost,tibbe,17)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,17,foo)),
-  ?assertEqual({200,"foo"},
-               rets_client:delete(localhost,tibbe,17)),
-  ?assertEqual({404,"no_such_key"},
-               rets_client:get(localhost,tibbe,17)),
-  ?assertEqual({200,true},
-               rets_client:delete(localhost,tibbe)),
-  ?assertEqual({404,"no_such_table"},
-               rets_client:get(localhost,tibbe,17)),
-  ?assertEqual({404,"no_such_table"},
-               rets_client:get(localhost,tibbe)).
-
-t07_ets_test()     -> t07(ets).
-t07_leveldb_test() -> t07(leveldb).
-t07(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({404,"no_such_table"},
-               rets_client:get(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,[{tibbe,0}]},
-               rets_client:get(localhost)),
-  ?assertEqual({200,[]},
-               rets_client:get(localhost,tibbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,'a/2/x',segundo)),
-  ?assertEqual({200,"segundo"},
-               rets_client:get(localhost,tibbe,'a/./.')),
-  ?assertEqual({404,"key_element_is_period"},
-               rets_client:put(localhost,tibbe,'a/./.',s)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,'a/1/x',primo)),
-  ?assertEqual({404,"no_such_key"},
-                rets_client:get(localhost,tibbe,'a')),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe,'a',1)),
-  ?assertEqual({200,1},
-               rets_client:get(localhost,tibbe,'a')),
-  ?assertEqual({404,"multiple_hits"},
-               rets_client:get(localhost,tibbe,'a/./.')),
-  ?assertEqual({200,[{"a/1/x","primo"},{"a/2/x","segundo"}]},
-               rets_client:get(localhost,tibbe,'a/./.',multi)),
-  ?assertEqual({404,"no_such_key"},
-               rets_client:get(localhost,tibbe,'b/./.',multi)).
-
-t08_ets_test()     -> t08(ets).
-t08_leveldb_test() -> t08(leveldb).
-t08(Backend) ->
-  restart_rets(Backend),
-  T = [{"a","a"},{"b",[{"bb","bb"}]}], %% nested proplist
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tybbe)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tybbe,"abc",T)),
-  ?assertMatch({200,T},
-               rets_client:get(localhost,tybbe,"abc")).
-
-t09_ets_test()     -> t09(ets).
-t09_leveldb_test() -> t09(leveldb).
-t09(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tebbe)),
-  ?assertEqual({409,"end_of_table"},
-               rets_client:get(localhost,tebbe,0,next)),
-  ?assertEqual({409,"end_of_table"},
-               rets_client:get(localhost,tebbe,0,prev)),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tebbe,a,1)),
-  ?assertEqual({200,1},
-               rets_client:get(localhost,tebbe,a)),
-  ?assertEqual({409,"end_of_table"},
-               rets_client:get(localhost,tebbe,a,next)),
-  ?assertEqual({409,"end_of_table"},
-               rets_client:get(localhost,tebbe,a,prev)),
-  ?assertEqual({200,[{"a",1}]},
-               rets_client:get(localhost,tebbe,b,prev)),
-  ?assertEqual({200,[{"a",1}]},
-               rets_client:get(localhost,tebbe,0,next)).
 
 restart_rets(Backend) ->
   application:stop(rets),

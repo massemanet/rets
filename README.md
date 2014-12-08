@@ -27,7 +27,6 @@ GET     KeyW  single             succeeds iff 1 Key      Val
 GET     KeyW  multi              multi read Key          [{Key,Val}]
 GET     KeyW  next               next                    {NextKey,NextVal}
 GET     KeyW  prev               prev                    {PrevKey,PrevVal}
-GET                    [ReadOp]  read many keys          [{Key,Val}]
 
 PUT     Key   gauge              create gauge            null|OldVal
 PUT     Key   force    Val       insert Key/Val          OldVal
@@ -35,7 +34,8 @@ PUT     Key            [NV,OV]   ins Key/NV iff Key/OV   OldVal
 PUT     Key   bump               bump Val by one         NewInt=OldInt+1
 PUT     Key   reset              reset Val to zero       OldInt
 
-POST                   [WriteOp] mutate Keys             null
+POST          write    [WriteOp] mutate Keys             null
+POST          read     [ReadOp]  read many keys          [{Key,Val}|Val]
 
 DELETE  Key   gauge              delete gauge on Key     null|Value
 DELETE  Key   force              delete Key              null|Value
