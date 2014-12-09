@@ -74,42 +74,28 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("GET"   ,[KeyW],["gauge"],_) -> g({gauge,    [KeyW]});
-x("GET"   ,[KeyW],["keys"] ,_) -> g({keys,     [KeyW]});
-x("GET"   ,[KeyW],["next"] ,_) -> g({next,     [KeyW]});
-x("GET"   ,[KeyW],["prev"] ,_) -> g({prev,     [KeyW]});
-x("GET"   ,[KeyW],["multi"],_) -> g({multi,    [KeyW]});
-x("GET"   ,[KeyW],_        ,_) -> g({single,   [KeyW]});
+x("GET"   ,[Key],["gauge"],_) -> g({gauge,    [chk_key(r,Key)]});
+x("GET"   ,[Key],["keys"] ,_) -> g({keys,     [chk_key(r,Key)]});
+x("GET"   ,[Key],["next"] ,_) -> g({next,     [chk_key(r,Key)]});
+x("GET"   ,[Key],["prev"] ,_) -> g({prev,     [chk_key(r,Key)]});
+x("GET"   ,[Key],["multi"],_) -> g({multi,    [chk_key(r,Key)]});
+x("GET"   ,[Key],_        ,_) -> g({single,   [chk_key(r,Key)]});
 
-x("PUT"   ,[Key] ,["gauge"],_) -> g({mk_gauge, [Key]});
-x("PUT"   ,[Key] ,["force"],R) -> g({force_ins,[chkk(Key),body(R)]});
-x("PUT"   ,[Key] ,[]       ,R) -> g({insert,   [chkk(Key),body(R)]});
-x("PUT"   ,[Key] ,["bump"] ,_) -> g({bump,     [chkk(Key),1]});
-x("PUT"   ,[Key] ,["reset"],_) -> g({reset,    [chkk(Key),0]});
+x("PUT"   ,[Key],["gauge"],_) -> g({mk_gauge, [chk_key(w,Key)]});
+x("PUT"   ,[Key],["force"],R) -> g({force_ins,[chk_key(w,Key),body(R)]});
+x("PUT"   ,[Key],[]       ,R) -> g({insert,   [chk_key(w,Key),body(R)]});
+x("PUT"   ,[Key],["bump"] ,_) -> g({bump,     [chk_key(w,Key),1]});
+x("PUT"   ,[Key],["reset"],_) -> g({reset,    [chk_key(w,Key),0]});
 
-x("POST"  ,[]    ,["write"],R) -> g({write_ops,[chkb(body(R))]});
-x("POST"  ,[]    ,["read"] ,R) -> g({read_ops, [chkb(body(R))]});
+x("POST"  ,[]   ,["write"],R) -> g({write_ops,[chk_body(w,body(R))]});
+x("POST"  ,[]   ,["read"] ,R) -> g({read_ops, [chk_body(r,body(R))]});
 
-x("DELETE",[Key] ,["gauge"],_) -> g({del_gauge,[Key]});
-x("DELETE",[Key] ,["force"],_) -> g({force_del,[Key]});
-x("DELETE",[Key] ,[]       ,R) -> g({delete,   [Key,body(R)]});
+x("DELETE",[Key],["gauge"],_) -> g({del_gauge,[chk_key(w,Key)]});
+x("DELETE",[Key],["force"],_) -> g({force_del,[chk_key(w,Key)]});
+x("DELETE",[Key],[]       ,R) -> g({delete,   [chk_key(w,Key),body(R)]});
 
-x("TRACE" ,_     ,_        ,_) -> throw({405,"method not allowed"});
-x(Meth    ,URI   ,Headers  ,_) -> throw({404,{Meth,URI,Headers}}).
-
-g(FArgs) ->
-  case gen_server:call(rets_handler,FArgs) of
-    {ok,Reply} -> Reply;
-    Bad        -> throw(Bad)
-  end.
-
-chkb({Body}) -> lists:map(fun chk_bp/1,Body).
-chk_bp({Key,Val}) ->
-  {chkk(string:tokens(binary_to_list(Key),"/")),Val}.
-
-chkk(Key) -> lists:map(fun chk_el/1,Key).
-chk_el(".") -> throw({404,key_element_is_period});
-chk_el(El)  -> El.
+x("TRACE" ,_    ,_        ,_) -> throw({405,"method not allowed"});
+x(Meth    ,URI  ,Headers  ,_) -> throw({404,{Meth,URI,Headers}}).
 
 body(Req) ->
   case cowboy_req:has_body(Req) of
@@ -128,16 +114,22 @@ method(Req) ->
 
 uri(Req) ->
   {URI,_} = cowboy_req:path_info(Req),
-  chk_uri(URI).
+  URI.
 
-chk_uri([<<>>]) ->
-  [];
-chk_uri(URI) ->
-  try
-    [lists:map(fun good_char/1,binary_to_list(E)) || E <- URI]
-  catch
-    throw:{bad_char,C} -> {bad_char,{[C]}}
+g(FArgs) ->
+  case gen_server:call(rets_handler,FArgs) of
+    {ok,Reply} -> Reply;
+    Bad        -> throw(Bad)
   end.
+
+chk_body(RorW,{Body}) -> lists:map(fun(E) -> chk_bp(RorW,E) end,Body).
+chk_bp(RorW,{Key,Val}) ->
+  {chk_key(RorW,string:tokens(binary_to_list(Key),"/")),Val}.
+
+chk_key(RorW,Key) -> lists:map(fun(E) -> chkk_el(RorW,E) end,Key).
+chkk_el(r,<<".">>) -> throw({404,key_element_is_period});
+chkk_el(w,<<".">>) -> ".";
+chkk_el(_,El)      -> lists:map(fun good_char/1,binary_to_list(El)).
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
