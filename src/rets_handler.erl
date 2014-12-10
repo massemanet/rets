@@ -74,8 +74,8 @@ expand_recs(Term) ->
 -record(state,{
           %% Settable parameters
           %% Set from erl start command (erl -rets backend leveldb)
-          backend,  %% leveldb|ets
-          env,      %% result of application:get_all_env(rets)
+          backend, %% leveldb|ets
+          env,     %% result of application:get_all_env(rets)
 
           %% Non-settable paramaters
           cb_mod,  %% rets BE callback module
@@ -95,9 +95,9 @@ do_init(Args) ->
 do_terminate(State) ->
   (State#state.cb_mod):terminate(State#state.cb_state).
 
-do_handle_call({F,Args},State) ->
+do_handle_call(Ops,State) ->
   try
-    {Reply,CBS} = (State#state.cb_mod):F(State#state.cb_state,Args),
+    {Reply,CBS} = (State#state.cb_mod):ops(State#state.cb_state,Ops),
     {reply,{ok,Reply},State#state{cb_state=CBS}}
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}

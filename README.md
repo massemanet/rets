@@ -17,16 +17,16 @@ the old value).
 
 Deletes are either unconditional or done in CAS style.
 
-Counters are special integer values, handled through the "counter" and
+Counters are special integer values, handled through the "bump" and
 "reset" operations.
 
 Method  URL   Header   Body      Action                  On success, returns
-GET     KeyW  gauge              get all matching gauges [{Key,Size}]
-GET     KeyW  keys               get all matching keys   [Key]
 GET     KeyW  single             succeeds iff 1 Key      Val
 GET     KeyW  multi              multi read Key          [{Key,Val}]
 GET     KeyW  next               next                    {NextKey,NextVal}
 GET     KeyW  prev               prev                    {PrevKey,PrevVal}
+GET     KeyW  gauge              get all matching gauges [{Key,Size}]
+GET     KeyW  keys               get all matching keys   [Key]
 
 PUT     Key   gauge              create gauge            null|OldVal
 PUT     Key   force    Val       insert Key/Val          OldVal
@@ -48,11 +48,15 @@ DELETE  Key            Val       delete Key iff Key/Val  null
   period is a wildcard, and matches any Element
   Val is a JSON object
   WriteOp is; ["delete",Key] | ["delete",Key,OldVal] |
-              ["insert",Key,Val] | ["insert",Key,Val,OldVal]
-  ReadOp is; ["single",KeyW] | ["multi",KeyW]
+              ["insert",Key,Val] | ["insert",Key,Val,OldVal] |
+              ["bump",Key] | ["reset",Key] |
+              ["mk_gauge",Key] | ["del_gauge",Key]
+  ReadOp is; ["single",KeyW] | ["multi",KeyW] |
+             ["next",KeyW] | ["prev",KeyW] |
+             ["gauge",KeyW] | ["keys",KeyW]
+
 
 ## EXAMPLES
-
 Start like this;
 ```
 erl -pa ebin/ -pa deps/*/ebin -run rets
