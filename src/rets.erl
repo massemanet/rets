@@ -75,26 +75,26 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("GET"   ,[Key],["gauge"],_)  -> g([chk_bp(r,["gauge",Key])]);
-x("GET"   ,[Key],["keys"] ,_)  -> g([chk_bp(r,["keys",Key])]);
-x("GET"   ,[Key],["next"] ,_)  -> g([chk_bp(r,["next",Key])]);
-x("GET"   ,[Key],["prev"] ,_)  -> g([chk_bp(r,["prev",Key])]);
-x("GET"   ,[Key],["multi"],_)  -> g([chk_bp(r,["multi",Key])]);
-x("GET"   ,[Key],["single"],_) -> g([chk_bp(r,["single",Key])]);
-x("GET"   ,[Key],[]        ,_) -> g([chk_bp(r,["single",Key])]);
+x("GET"   ,Key,["gauge"],_)  -> g([chk_bp(r,["gauge",Key])]);
+x("GET"   ,Key,["keys"] ,_)  -> g([chk_bp(r,["keys",Key])]);
+x("GET"   ,Key,["next"] ,_)  -> g([chk_bp(r,["next",Key])]);
+x("GET"   ,Key,["prev"] ,_)  -> g([chk_bp(r,["prev",Key])]);
+x("GET"   ,Key,["multi"],_)  -> g([chk_bp(r,["multi",Key])]);
+x("GET"   ,Key,["single"],_) -> g([chk_bp(r,["single",Key])]);
+x("GET"   ,Key,[]        ,_) -> g([chk_bp(r,["single",Key])]);
 
-x("PUT"   ,[Key],[]       ,R)  -> g([chk_bp(w,["insert",Key,dbl(body(R))])]);
-x("PUT"   ,[Key],["force"],R)  -> g([chk_bp(w,["insert",Key,body(R)])]);
-x("PUT"   ,[Key],["gauge"],_)  -> g([chk_bp(w,["mk_gauge",Key])]);
-x("PUT"   ,[Key],["bump"] ,_)  -> g([chk_bp(w,["bump",Key])]);
-x("PUT"   ,[Key],["reset"],_)  -> g([chk_bp(w,["reset",Key])]);
+x("PUT"   ,Key,[]       ,R)  -> g([chk_bp(w,["insert",Key,dbl(body(R))])]);
+x("PUT"   ,Key,["force"],R)  -> g([chk_bp(w,["insert",Key,body(R)])]);
+x("PUT"   ,Key,["gauge"],_)  -> g([chk_bp(w,["mk_gauge",Key])]);
+x("PUT"   ,Key,["bump"] ,_)  -> g([chk_bp(w,["bump",Key])]);
+x("PUT"   ,Key,["reset"],_)  -> g([chk_bp(w,["reset",Key])]);
 
-x("DELETE",[Key],[]       ,R)  -> g([chk_bp(w,["delete",Key,body(R)])]);
-x("DELETE",[Key],["gauge"],_)  -> g([chk_bp(w,["del_gauge",Key])]);
-x("DELETE",[Key],["force"],_)  -> g([chk_bp(w,["delete",Key])]);
+x("DELETE",Key,[]       ,R)  -> g([chk_bp(w,["delete",Key,body(R)])]);
+x("DELETE",Key,["gauge"],_)  -> g([chk_bp(w,["del_gauge",Key])]);
+x("DELETE",Key,["force"],_)  -> g([chk_bp(w,["delete",Key])]);
 
-x("POST"  ,[]   ,["write"],R)  -> g(chk_body(w,body(R)));
-x("POST"  ,[]   ,["read"] ,R)  -> g(chk_body(r,body(R)));
+x("POST"  ,<<>> ,["write"],R)  -> g(chk_body(w,body(R)));
+x("POST"  ,<<>> ,["read"] ,R)  -> g(chk_body(r,body(R)));
 
 x("TRACE" ,_    ,_        ,_)  -> throw({405,"method not allowed"});
 x(Meth    ,URI  ,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).

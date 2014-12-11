@@ -89,11 +89,11 @@ getter(S,multi,Key) ->
         As -> {As}
       end;
     Val ->
-      {[{list_to_binary(Key),Val}]}
+      {[{Key,Val}]}
   end.
 
 next(S,Key,WKey,Acc) ->
-  case nextprev(S,next,Key) of
+  case nextprev(S,{next,Key}) of
     end_of_table -> lists:reverse(Acc);
     {Key,V} ->
       case key_match(WKey,Key) of

@@ -61,6 +61,6 @@ xref: compile-all
 deps/.dialyzer_plt: ~/.dialyzer_plt
 	-dialyzer --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
 
-dialyze: deps/.dialyzer_plt
+dialyze: compile deps/.dialyzer_plt
 	$(shell [ -d .eunit ] && rm -rf .eunit)
 	dialyzer ebin -nn --plt deps/.dialyzer_plt
