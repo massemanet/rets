@@ -46,7 +46,7 @@ delete_file(Op,File) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 ops(S,Ops) ->
-  {lists:map(mk_committer(S),lists:map(mk_validator(S),Ops)),
+  {{lists:map(mk_committer(S),lists:map(mk_validator(S),Ops))},
    S}.
 
 mk_validator(S) ->
@@ -67,8 +67,8 @@ assert(S,K,OV) ->
 
 mk_committer(S) ->
   fun
-    ({insert,Key,Val}) -> {Key,inserter(S,Key,Val)};
-    ({delete,Key})     -> {Key,deleter(S,Key)}
+    ({insert,Key,Val}) -> inserter(S,Key,Val);
+    ({delete,Key})     -> deleter(S,Key)
   end.
 
 %% get data from leveldb.
