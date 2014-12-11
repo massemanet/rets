@@ -136,13 +136,13 @@ chk_bp(r,[<<"prev">>,K])          -> emit_bp(r,prev,K);
 chk_bp(r,[<<"gauge">>,K])         -> emit_bp(r,gauge,K);
 chk_bp(r,[<<"keys">>,K])          -> emit_bp(r,keys,K);
 chk_bp(w,[<<"insert">>,K,{V,OV}]) -> chk_bp(w,[<<"insert">>,K,V,OV]);
-chk_bp(w,[<<"insert">>,K,V])      -> chk_bp(w,[<<"insert">>,K,V,null]);
-chk_bp(w,[<<"delete">>,K])        -> chk_bp(w,[<<"delete">>,K,null]);
+chk_bp(w,[<<"insert">>,K,V])      -> chk_bp(w,[<<"insert">>,K,V,force]);
+chk_bp(w,[<<"delete">>,K])        -> chk_bp(w,[<<"delete">>,K,force]);
 chk_bp(w,[<<"insert">>,K,V,OV])   -> emit_bp(w,insert,K,{V,OV});
-chk_bp(w,[<<"bump">>,K])          -> emit_bp(w,bump,K,null);
-chk_bp(w,[<<"reset">>,K])         -> emit_bp(w,reset,K,null);
-chk_bp(w,[<<"mk_gauge">>,K])      -> emit_bp(w,mk_gauge,K,null);
-chk_bp(w,[<<"del_gauge">>,K])     -> emit_bp(w,del_gauge,K,null);
+chk_bp(w,[<<"bump">>,K])          -> emit_bp(w,bump,K,force);
+chk_bp(w,[<<"reset">>,K])         -> emit_bp(w,reset,K,force);
+chk_bp(w,[<<"mk_gauge">>,K])      -> emit_bp(w,mk_gauge,K,force);
+chk_bp(w,[<<"del_gauge">>,K])     -> emit_bp(w,del_gauge,K,force);
 chk_bp(w,[<<"delete">>,K,V])      -> emit_bp(w,delete,K,V);
 chk_bp(RorW,What)                 -> throw({400,{bad_request,{RorW,What}}}).
 

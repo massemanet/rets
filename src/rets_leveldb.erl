@@ -45,8 +45,31 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-ops(S,Wops) ->
-  {Wops,S}.
+ops(S,Ops) ->
+  {lists:map(mk_committer(S),lists:map(mk_validator(S),Ops)),
+   S}.
+
+mk_validator(S) ->
+  fun
+    ({K,insert,{V,force}}) -> {insert,K,V};
+    ({K,insert,{V,OV}})    -> assert(S,K,OV),{insert,K,V};
+    ({K,delete,force})     -> {delete,K};
+    ({K,delete,OV})        -> assert(S,K,OV),{delete,K}
+  end.
+
+assert(S,K,OV) ->
+  case {lvl_get(S,K),OV} of
+    {not_found,null} -> ok;
+    {not_found,OV}   -> throw({400,{key_exists,K,OV}});
+    {OV,OV}          -> ok;
+    {V,OV}           -> throw({400,{inconsistence,K,V,OV}})
+  end.
+
+mk_committer(S) ->
+  fun
+    ({insert,Key,Val}) -> {Key,inserter(S,Key,Val)};
+    ({delete,Key})     -> {Key,deleter(S,Key)}
+  end.
 
 %% get data from leveldb.
 nextprev(S,OP,Key) ->
@@ -107,15 +130,6 @@ key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
 key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
 key_match(_,_)                 -> false.
 
-deleter(S,Key) ->
-  case lvl_get(S,Key) of
-    not_found ->
-      null;
-    Val ->
-      lvl_delete(S,Key),
-      Val
-  end.
-
 key_getter(S,Key) ->
   Iter = lvl_iter(S,keys_only),
   R = fold_loop(lvl_mv_iter(Iter,Key),Key,Iter,[]),
@@ -131,16 +145,27 @@ fold_loop(K,Key,Iter,Acc) ->
 
 update_counter(S,Key,Incr) ->
   case lvl_get(S,Key) of
-    not_found -> do_ins(S,Key,Incr);
-    Val       -> do_ins(S,Key,Val+Incr)
+    not_found -> inserter(S,Key,Incr);
+    Val       -> inserter(S,Key,Val+Incr)
   end.
 
 reset_counter(S,Key,Val) ->
-  do_ins(S,Key,Val).
+  inserter(S,Key,Val).
 
-do_ins(S,Key,Val) ->
-  lvl_put(S,Key,pack_val(Val)),
-  Val.
+inserter(S,Key,Val) ->
+  Bkey = mk_bkey(Key),
+  lvl_put(S,Bkey,pack_val(Val)),
+  {Bkey,Val}.
+
+deleter(S,Key) ->
+  Bkey = mk_bkey(Key),
+  case lvl_get(S,Bkey) of
+    not_found ->
+      {Bkey,null};
+    Val ->
+      lvl_delete(S,Bkey),
+      {Bkey,Val}
+  end.
 
 %% data packing
 pack_val(Val) ->
@@ -151,6 +176,8 @@ unpack_val(Val) ->
 %% key mangling
 mk_ekey(Bin) ->
   string:tokens(binary_to_list(Bin),"/").
+mk_bkey(Els) ->
+  list_to_binary(string:join(Els,"/")).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% leveldb API
