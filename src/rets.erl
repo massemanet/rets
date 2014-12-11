@@ -73,7 +73,7 @@ reply(409,R) -> flat(R);
 reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 
 reply(Req) ->
-  x(method(Req),uri(Req),rets_headers(Req),Req).
+  x(method(Req),mk_ekey(uri(Req)),rets_headers(Req),Req).
 
 x("GET"   ,Key,["gauge"],_)  -> g([chk_bp(r,["gauge",Key])]);
 x("GET"   ,Key,["keys"] ,_)  -> g([chk_bp(r,["keys",Key])]);
@@ -93,8 +93,8 @@ x("DELETE",Key,[]       ,R)  -> g([chk_bp(w,["delete",Key,body(R)])]);
 x("DELETE",Key,["gauge"],_)  -> g([chk_bp(w,["del_gauge",Key])]);
 x("DELETE",Key,["force"],_)  -> g([chk_bp(w,["delete",Key])]);
 
-x("POST"  ,<<>> ,["write"],R)  -> g(chk_body(w,body(R)));
-x("POST"  ,<<>> ,["read"] ,R)  -> g(chk_body(r,body(R)));
+x("POST"  ,[] ,["write"],R)  -> g(chk_body(w,body(R)));
+x("POST"  ,[] ,["read"] ,R)  -> g(chk_body(r,body(R)));
 
 x("TRACE" ,_    ,_        ,_)  -> throw({405,"method not allowed"});
 x(Meth    ,URI  ,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).
@@ -123,35 +123,38 @@ uri(Req) ->
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
     {ok,Reply} -> Reply;
-    Bad        -> throw(Bad)
+    {Status,R} -> throw({Status,R})
   end.
 
-chk_body(RorW,{Body}) ->
+chk_body(RorW,Body) ->
   lists:sort(lists:map(fun(E) -> chk_bp(RorW,E) end,Body)).
 
-chk_bp(r,["single",K])        -> emit_bp(r,single,K);
-chk_bp(r,["multi",K])         -> emit_bp(r,multi,K);
-chk_bp(r,["next",K])          -> emit_bp(r,next,K);
-chk_bp(r,["prev",K])          -> emit_bp(r,prev,K);
-chk_bp(r,["gauge",K])         -> emit_bp(r,gauge,K);
-chk_bp(r,["keys",K])          -> emit_bp(r,keys,K);
-chk_bp(w,["insert",K,{V,OV}]) -> chk_bp(w,["insert",K,V,OV]);
-chk_bp(w,["insert",K,V])      -> chk_bp(w,["insert",K,V,null]);
-chk_bp(w,["delete",K])        -> chk_bp(w,["delete",K,null]);
-chk_bp(w,["insert",K,V,OV])   -> emit_bp(w,insert,K,{V,OV});
-chk_bp(w,["bump",K])          -> emit_bp(w,bump,K,null);
-chk_bp(w,["reset",K])         -> emit_bp(w,reset,K,null);
-chk_bp(w,["mk_gauge",K])      -> emit_bp(w,mk_gauge,K,null);
-chk_bp(w,["del_gauge",K])     -> emit_bp(w,del_gauge,K,null);
-chk_bp(w,["delete",K,V])      -> emit_bp(w,delete,K,V).
+chk_bp(r,[<<"single">>,K])        -> emit_bp(r,single,K);
+chk_bp(r,[<<"multi">>,K])         -> emit_bp(r,multi,K);
+chk_bp(r,[<<"next">>,K])          -> emit_bp(r,next,K);
+chk_bp(r,[<<"prev">>,K])          -> emit_bp(r,prev,K);
+chk_bp(r,[<<"gauge">>,K])         -> emit_bp(r,gauge,K);
+chk_bp(r,[<<"keys">>,K])          -> emit_bp(r,keys,K);
+chk_bp(w,[<<"insert">>,K,{V,OV}]) -> chk_bp(w,[<<"insert">>,K,V,OV]);
+chk_bp(w,[<<"insert">>,K,V])      -> chk_bp(w,[<<"insert">>,K,V,null]);
+chk_bp(w,[<<"delete">>,K])        -> chk_bp(w,[<<"delete">>,K,null]);
+chk_bp(w,[<<"insert">>,K,V,OV])   -> emit_bp(w,insert,K,{V,OV});
+chk_bp(w,[<<"bump">>,K])          -> emit_bp(w,bump,K,null);
+chk_bp(w,[<<"reset">>,K])         -> emit_bp(w,reset,K,null);
+chk_bp(w,[<<"mk_gauge">>,K])      -> emit_bp(w,mk_gauge,K,null);
+chk_bp(w,[<<"del_gauge">>,K])     -> emit_bp(w,del_gauge,K,null);
+chk_bp(w,[<<"delete">>,K,V])      -> emit_bp(w,delete,K,V);
+chk_bp(RorW,What)                 -> throw({400,{bad_request,{RorW,What}}}).
 
-emit_bp(r,Op,K)   -> {chk_key(r,string:tokens(binary_to_list(K),"/")),Op}.
-emit_bp(w,Op,K,V) -> {chk_key(w,string:tokens(binary_to_list(K),"/")),Op,V}.
+emit_bp(r,Op,K)   -> {chk_key(r,mk_ekey(K)),Op}.
+emit_bp(w,Op,K,V) -> {chk_key(w,mk_ekey(K)),Op,V}.
+
+mk_ekey(Key) -> string:tokens(binary_to_list(Key),"/").
 
 chk_key(RorW,Key) -> lists:map(fun(E) -> chkk_el(RorW,E) end,Key).
-chkk_el(w,<<".">>) -> throw({400,key_element_is_period});
-chkk_el(r,<<".">>) -> ".";
-chkk_el(_,El)      -> lists:map(fun good_char/1,binary_to_list(El)).
+chkk_el(w,".") -> throw({400,key_element_is_period});
+chkk_el(r,".") -> ".";
+chkk_el(_,El)  -> lists:map(fun good_char/1,El).
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
@@ -199,19 +202,21 @@ t01(Backend) ->
   restart_rets(Backend),
   ?assertEqual({200,null},
                rets_client:post(localhost,
-                                [{'aaa/1/x',"AAA"++[223]},
-                                 {bbb,bBbB},
-                                 {ccc,123.1},
-                                 {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
+                                [[insert,'aaa/1/x',"AAA"++[223]],
+                                 [insert,bbb,bBbB],
+                                 [insert,ccc,123.1],
+                                 [insert,ddd,[{a,"A"},{b,b},{c,123.3}]]],
+                                write)),
   ?assertEqual({200,[{"aaa/1/x",[$A,$A,$A,223]},
                      [$A,$A,$A,223],
                      bBbB,
                      [{ccc,123.1}]]},
-               rets_client:post(localhost,"",[],
-                               [{multi,'aaa/./x'},
-                                {single,'aaa/1/x'},
-                                {single,bbb},
-                                {multi,ccc}])).
+               rets_client:post(localhost,"",
+                               [[multi,'aaa/./x'],
+                                [single,'aaa/1/x'],
+                                [single,bbb],
+                                [multi,ccc]],
+                               read)).
 
 
 restart_rets(Backend) ->

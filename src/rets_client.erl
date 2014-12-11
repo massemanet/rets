@@ -39,18 +39,24 @@ delete(Host,Tab,Key) ->
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
 put(Host,Tab,Key,counter) ->
-  put(Host,Tab,Key,[{"rets","counter"}],[],[]);
+  put(Host,Tab,Key,[{"rets","counter"}],[]);
 put(Host,Tab,Key,reset) ->
-  put(Host,Tab,Key,[{"rets","reset"}],[],[]);
+  put(Host,Tab,Key,[{"rets","reset"}],[]);
 put(Host,Tab,Key,PL) ->
-  put(Host,Tab,Key,[],PL,[]).
+  put(Host,Tab,Key,[],PL).
 
 %% internal
-put(Host,Tab,Key,Headers,PL,[]) ->
+put(Host,Tab,Key,Headers,PL) ->
   httpc_request(put,Host,Tab,Key,Headers,PL).
 
-post(Host,Tab,PL) ->
-  httpc_request(post,Host,Tab,"",[],PL).
+post(Host,PL,read) ->
+  posti(Host,PL,[{"rets","read"}]);
+post(Host,PL,write) ->
+  posti(Host,PL,[{"rets","write"}]).
+
+%% internal
+posti(Host,PL,Headers) ->
+  httpc_request(post,Host,"","",Headers,PL).
 
 trace(Host) ->
   trace(Host,[]).
