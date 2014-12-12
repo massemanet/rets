@@ -10,7 +10,8 @@
 -author('Mats Cronqvist').
 -export([init/1,
          terminate/1,
-         ops/2]).
+         r/2,
+         w/2]).
 
 -record(state,
         {handle,
@@ -45,30 +46,31 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-ops(S,Ops) ->
+r(S,_Ops) ->
+  {null,S}.
+
+w(S,Ops) ->
   {{lists:map(mk_committer(S),lists:map(mk_validator(S),Ops))},
    S}.
 
 mk_validator(S) ->
   fun
-    ({K,insert,{V,force}}) -> {insert,K,V};
-    ({K,insert,{V,OV}})    -> assert(S,K,OV),{insert,K,V};
-    ({K,delete,force})     -> {delete,K};
-    ({K,delete,OV})        -> assert(S,K,OV),{delete,K}
+    ({K,insert,{V,force}}) -> {insert,K,V,getter(S,K)};
+    ({K,insert,{V,OV}})    -> {insert,K,V,assert(S,K,OV)};
+    ({K,delete,force})     -> {delete,K,getter(S,K)};
+    ({K,delete,OV})        -> {delete,K,assert(S,K,OV)}
   end.
 
 assert(S,K,OV) ->
-  case {lvl_get(S,K),OV} of
-    {not_found,null} -> ok;
-    {not_found,OV}   -> throw({400,{key_exists,K,OV}});
-    {OV,OV}          -> ok;
-    {V,OV}           -> throw({400,{inconsistence,K,V,OV}})
+  case {getter(S,K),OV} of
+    {{Bkey,OV},OV} -> {Bkey,OV};
+    {V,OV}  -> throw({400,{inconsistence,K,V,OV}})
   end.
 
 mk_committer(S) ->
   fun
-    ({insert,Key,Val}) -> inserter(S,Key,Val);
-    ({delete,Key})     -> deleter(S,Key)
+    ({insert,Key,Val,{_,OV}}) -> {inserter(S,Key,Val),OV};
+    ({delete,Key,{_,OV}})     -> {deleter(S,Key),OV}
   end.
 
 %% get data from leveldb.
@@ -105,14 +107,14 @@ getter(S,single,Ekey) ->
     _         -> throw({404,multiple_hits})
   end;
 getter(S,multi,Key) ->
-  case lvl_get(S,Key) of
-    not_found ->
+  case getter(S,Key) of
+    {_,null} ->
       case next(S,Key,Key,[]) of
         [] -> throw({404,no_such_key});
         As -> {As}
       end;
-    Val ->
-      {[{Key,Val}]}
+    {Bkey,Val} ->
+      {[{Bkey,Val}]}
   end.
 
 next(S,Key,WKey,Acc) ->
@@ -145,8 +147,8 @@ fold_loop(K,Key,Iter,Acc) ->
 
 update_counter(S,Key,Incr) ->
   case lvl_get(S,Key) of
-    not_found -> inserter(S,Key,Incr);
-    Val       -> inserter(S,Key,Val+Incr)
+    null -> inserter(S,Key,Incr);
+    Val  -> inserter(S,Key,Val+Incr)
   end.
 
 reset_counter(S,Key,Val) ->
@@ -155,17 +157,16 @@ reset_counter(S,Key,Val) ->
 inserter(S,Key,Val) ->
   Bkey = mk_bkey(Key),
   lvl_put(S,Bkey,pack_val(Val)),
-  {Bkey,Val}.
+  Bkey.
 
 deleter(S,Key) ->
   Bkey = mk_bkey(Key),
-  case lvl_get(S,Bkey) of
-    not_found ->
-      {Bkey,null};
-    Val ->
-      lvl_delete(S,Bkey),
-      {Bkey,Val}
-  end.
+  lvl_delete(S,Bkey),
+  Bkey.
+
+getter(S,Key) ->
+  Bkey = mk_bkey(Key),
+  {Bkey,lvl_get(S,Bkey)}.
 
 %% data packing
 pack_val(Val) ->
@@ -213,7 +214,7 @@ lvl_mv_iter(Iter,Where) ->
 lvl_get(S,Key) ->
   case eleveldb:get(S#state.handle,Key,[]) of
     {ok,V}      -> unpack_val(V);
-    not_found   -> not_found;
+    not_found   -> null;
     {error,Err} -> throw({500,{get_error,Err}})
   end.
 

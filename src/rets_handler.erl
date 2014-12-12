@@ -95,9 +95,9 @@ do_init(Args) ->
 do_terminate(State) ->
   (State#state.cb_mod):terminate(State#state.cb_state).
 
-do_handle_call(Ops,State) ->
+do_handle_call({F,Ops},State) ->
   try
-    {Reply,CBS} = (State#state.cb_mod):ops(State#state.cb_state,Ops),
+    {Reply,CBS} = (State#state.cb_mod):F(State#state.cb_state,Ops),
     {reply,{ok,Reply},State#state{cb_state=CBS}}
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}
