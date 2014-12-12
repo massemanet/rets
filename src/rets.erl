@@ -73,28 +73,28 @@ reply(409,R) -> flat(R);
 reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 
 reply(Req) ->
-  x(method(Req),mk_ekey(uri(Req)),rets_headers(Req),Req).
+  x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("GET"   ,Key,["gauge"],_)  -> g(r,[chk_bp(r,["gauge",Key])]);
-x("GET"   ,Key,["keys"] ,_)  -> g(r,[chk_bp(r,["keys",Key])]);
-x("GET"   ,Key,["next"] ,_)  -> g(r,[chk_bp(r,["next",Key])]);
-x("GET"   ,Key,["prev"] ,_)  -> g(r,[chk_bp(r,["prev",Key])]);
-x("GET"   ,Key,["multi"],_)  -> g(r,[chk_bp(r,["multi",Key])]);
-x("GET"   ,Key,["single"],_) -> g(r,[chk_bp(r,["single",Key])]);
-x("GET"   ,Key,[]        ,_) -> g(r,[chk_bp(r,["single",Key])]);
+x("GET"   ,Key,["gauge"],_)  -> g(r,[{gauge,Key}]);
+x("GET"   ,Key,["keys"] ,_)  -> g(r,[{keys,Key}]);
+x("GET"   ,Key,["next"] ,_)  -> g(r,[{next,Key}]);
+x("GET"   ,Key,["prev"] ,_)  -> g(r,[{prev,Key}]);
+x("GET"   ,Key,["multi"],_)  -> g(r,[{multi,Key}]);
+x("GET"   ,Key,["single"],_) -> g(r,[{single,Key}]);
+x("GET"   ,Key,[]        ,_) -> g(r,[{single,Key}]);
 
-x("PUT"   ,Key,[]       ,R)  -> g(w,[chk_bp(w,["insert",Key,dbl(body(R))])]);
-x("PUT"   ,Key,["force"],R)  -> g(w,[chk_bp(w,["insert",Key,body(R)])]);
-x("PUT"   ,Key,["gauge"],_)  -> g(w,[chk_bp(w,["mk_gauge",Key])]);
-x("PUT"   ,Key,["bump"] ,_)  -> g(w,[chk_bp(w,["bump",Key])]);
-x("PUT"   ,Key,["reset"],_)  -> g(w,[chk_bp(w,["reset",Key])]);
+x("PUT"   ,Key,[]       ,R)  -> g(w,[{insert,Key,dbl(body(R))}]);
+x("PUT"   ,Key,["force"],R)  -> g(w,[{insert,Key,body(R)}]);
+x("PUT"   ,Key,["gauge"],_)  -> g(w,[{mk_gauge,Key}]);
+x("PUT"   ,Key,["bump"] ,_)  -> g(w,[{bump,Key}]);
+x("PUT"   ,Key,["reset"],_)  -> g(w,[{reset,Key}]);
 
-x("DELETE",Key,[]       ,R)  -> g(w,[chk_bp(w,["delete",Key,body(R)])]);
-x("DELETE",Key,["gauge"],_)  -> g(w,[chk_bp(w,["del_gauge",Key])]);
-x("DELETE",Key,["force"],_)  -> g(w,[chk_bp(w,["delete",Key])]);
+x("DELETE",Key,[]       ,R)  -> g(w,[{delete,Key,body(R)}]);
+x("DELETE",Key,["gauge"],_)  -> g(w,[{del_gauge,Key}]);
+x("DELETE",Key,["force"],_)  -> g(w,[{delete,Key}]);
 
-x("POST"  ,[] ,["write"],R)  -> g(w,chk_body(w,body(R)));
-x("POST"  ,[] ,["read"] ,R)  -> g(r,chk_body(r,body(R)));
+x("POST"  ,[] ,["write"],R)  -> g(w,body(R));
+x("POST"  ,[] ,["read"] ,R)  -> g(r,body(R));
 
 x("TRACE" ,_    ,_        ,_)  -> throw({405,"method not allowed"});
 x(Meth    ,URI  ,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).
@@ -146,15 +146,15 @@ chk_bp(w,[<<"del_gauge">>,K])     -> emit_bp(w,del_gauge,K,force);
 chk_bp(w,[<<"delete">>,K,V])      -> emit_bp(w,delete,K,V);
 chk_bp(RorW,What)                 -> throw({400,{bad_request,{RorW,What}}}).
 
-emit_bp(r,Op,K)   -> {chk_key(r,mk_ekey(K)),Op}.
-emit_bp(w,Op,K,V) -> {chk_key(w,mk_ekey(K)),Op,V}.
+emit_bp(r,Op,K)   -> {chk_key(r,K),Op}.
+emit_bp(w,Op,K,V) -> {chk_key(w,K),Op,V}.
 
-mk_ekey(Key) -> string:tokens(binary_to_list(Key),"/").
-
-chk_key(RorW,Key) -> lists:map(fun(E) -> chkk_el(RorW,E) end,Key).
+chk_key(RorW,Key) -> lists:map(fun(E) -> chkk_el(RorW,E) end,mk_ekey(Key)).
 chkk_el(w,".") -> throw({400,key_element_is_period});
 chkk_el(r,".") -> ".";
 chkk_el(_,El)  -> lists:map(fun good_char/1,El).
+
+mk_ekey(Key) -> string:tokens(binary_to_list(Key),"/").
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"

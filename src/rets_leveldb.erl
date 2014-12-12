@@ -46,12 +46,19 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-r(S,_Ops) ->
-  {null,S}.
+r(S,Ops) ->
+  {{lists:foldl(mk_reader(S),[],Ops)},
+   S}.
 
 w(S,Ops) ->
   {{lists:map(mk_committer(S),lists:map(mk_validator(S),Ops))},
    S}.
+
+mk_reader(S) ->
+  fun
+    ({K,single},A) -> [wgetter(S,single,K)|A];
+    ({K,multi},A)  -> wgetter(S,multi,K)++A
+  end.
 
 mk_validator(S) ->
   fun
@@ -74,6 +81,53 @@ mk_committer(S) ->
   end.
 
 %% get data from leveldb.
+inserter(S,Key,Val) ->
+  Bkey = mk_bkey(Key),
+  lvl_put(S,Bkey,pack_val(Val)),
+  Bkey.
+
+deleter(S,Key) ->
+  Bkey = mk_bkey(Key),
+  lvl_delete(S,Bkey),
+  Bkey.
+
+%% keys without wildcards
+getter(S,Key) ->
+  Bkey = mk_bkey(Key),
+  {Bkey,lvl_get(S,Bkey)}.
+
+%% allow wildcards (".") in keys
+wgetter(S,single,Key) ->
+  case wgetter(S,multi,Key) of
+    [{Bkey,V}] -> [{Bkey,V}];
+    _       -> throw({404,{multiple_hits,Key}})
+  end;
+wgetter(S,multi,Key) ->
+  case getter(S,Key) of
+    {_,null} ->
+      case next(S,Key,Key,[]) of
+        [] -> throw({404,{no_such_key,Key}});
+        As -> As
+      end;
+    {Bkey,Val} ->
+      [{Bkey,Val}]
+  end.
+
+next(S,Key,WKey,Acc) ->
+  case nextprev(S,{next,Key}) of
+    end_of_table -> lists:reverse(Acc);
+    {Key,V} ->
+      case key_match(WKey,Key) of
+        true -> next(S,Key,WKey,[{mk_bkey(Key),unpack_val(V)}|Acc]);
+        false-> Acc
+      end
+  end.
+
+key_match([],[])               -> true;
+key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
+key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
+key_match(_,_)                 -> false.
+
 nextprev(S,OP,Key) ->
   case nextprev(S,{OP,Key}) of
     end_of_table -> throw({409,end_of_table});
@@ -82,7 +136,7 @@ nextprev(S,OP,Key) ->
 
 nextprev(S,{OP,Key}) ->
   Iter = lvl_iter(S,key_vals),
-  check_np(OP,lvl_mv_iter(Iter,Key),Iter,Key).
+  check_np(OP,lvl_mv_iter(Iter,mk_bkey(Key)),Iter,Key).
 
 check_np(prev,invalid_iterator,Iter,Key) ->
   case lvl_mv_iter(Iter,last) of
@@ -99,38 +153,6 @@ check_np(OP,{Key,_},Iter,Key) ->
   check_np(OP,lvl_mv_iter(Iter,OP),Iter,Key);
 check_np(_,{Key,V},_,_) ->
   {Key,V}.
-
-%% allow wildcards (".") in keys
-getter(S,single,Ekey) ->
-  case getter(S,multi,Ekey) of
-    {[{_,V}]} -> V;
-    _         -> throw({404,multiple_hits})
-  end;
-getter(S,multi,Key) ->
-  case getter(S,Key) of
-    {_,null} ->
-      case next(S,Key,Key,[]) of
-        [] -> throw({404,no_such_key});
-        As -> {As}
-      end;
-    {Bkey,Val} ->
-      {[{Bkey,Val}]}
-  end.
-
-next(S,Key,WKey,Acc) ->
-  case nextprev(S,{next,Key}) of
-    end_of_table -> lists:reverse(Acc);
-    {Key,V} ->
-      case key_match(WKey,Key) of
-        true -> next(S,Key,WKey,[{Key,unpack_val(V)}|Acc]);
-        false-> Acc
-      end
-  end.
-
-key_match([],[])               -> true;
-key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
-key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
-key_match(_,_)                 -> false.
 
 key_getter(S,Key) ->
   Iter = lvl_iter(S,keys_only),
@@ -153,20 +175,6 @@ update_counter(S,Key,Incr) ->
 
 reset_counter(S,Key,Val) ->
   inserter(S,Key,Val).
-
-inserter(S,Key,Val) ->
-  Bkey = mk_bkey(Key),
-  lvl_put(S,Bkey,pack_val(Val)),
-  Bkey.
-
-deleter(S,Key) ->
-  Bkey = mk_bkey(Key),
-  lvl_delete(S,Bkey),
-  Bkey.
-
-getter(S,Key) ->
-  Bkey = mk_bkey(Key),
-  {Bkey,lvl_get(S,Bkey)}.
 
 %% data packing
 pack_val(Val) ->
