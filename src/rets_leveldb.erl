@@ -4,7 +4,7 @@
 %% @doc
 %% @end
 
--compile(export_all).
+%%-compile(export_all).
 
 -module('rets_leveldb').
 -author('Mats Cronqvist').
@@ -57,7 +57,10 @@ w(S,Ops) ->
 mk_reader(S) ->
   fun
     ({single,K}) -> wgetter(S,single,K);
-    ({multi,K})  -> wgetter(S,multi,K)
+    ({multi,K})  -> wgetter(S,multi,K);
+    ({next,K})   -> nextprev(S,next,K);
+    ({prev,K})   -> nextprev(S,prev,K);
+    ({keys,K})   -> key_getter(S,K)
   end.
 
 mk_validator(S) ->
@@ -65,7 +68,9 @@ mk_validator(S) ->
     ({insert,K,{V,force}}) -> {insert,K,V,getter(S,K)};
     ({insert,K,{V,OV}})    -> {insert,K,V,assert(S,K,OV)};
     ({delete,K,force})     -> {delete,K,getter(S,K)};
-    ({delete,K,OV})        -> {delete,K,assert(S,K,OV)}
+    ({delete,K,OV})        -> {delete,K,assert(S,K,OV)};
+    ({bump,K,force})       -> {bump,K,1};
+    ({reset,K,force})      -> {reset,K,0}
   end.
 
 assert(S,K,OV) ->
@@ -77,7 +82,9 @@ assert(S,K,OV) ->
 mk_committer(S) ->
   fun
     ({insert,Key,Val,{_,OV}}) -> inserter(S,Key,Val),{Key,OV};
-    ({delete,Key,{_,OV}})     -> deleter(S,Key),{Key,OV}
+    ({delete,Key,{_,OV}})     -> deleter(S,Key),{Key,OV};
+    ({bump,K,I})              -> update_counter(S,K,I);
+    ({reset,K,Z})             -> reset_counter(S,K,Z)
   end.
 
 %% get data from leveldb.
@@ -158,9 +165,9 @@ key_getter(S,Key) ->
 
 fold_loop(invalid_iterator,_,_,Acc) ->
   Acc;
-fold_loop(K,Key,Iter,Acc) ->
-  case key_match(K,Key) of
-    true -> fold_loop(lvl_mv_iter(Iter,prefetch),Key,Iter,[K|Acc]);
+fold_loop(K,KeyW,Iter,Acc) ->
+  case key_match(KeyW,K) of
+    true -> fold_loop(lvl_mv_iter(Iter,prefetch),KeyW,Iter,[K|Acc]);
     false-> Acc
   end.
 
@@ -182,8 +189,6 @@ unpack_val(Val) ->
 %% key mangling
 mk_ekey(Bin) ->
   string:tokens(binary_to_list(Bin),"/").
-mk_bkey(Els) ->
-  list_to_binary(string:join(Els,"/")).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% leveldb API
