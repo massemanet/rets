@@ -56,16 +56,16 @@ w(S,Ops) ->
 
 mk_reader(S) ->
   fun
-    ({K,single},A) -> [wgetter(S,single,K)|A];
-    ({K,multi},A)  -> wgetter(S,multi,K)++A
+    ({single,K},A) -> [wgetter(S,single,K)|A];
+    ({multi,K},A)  -> wgetter(S,multi,K)++A
   end.
 
 mk_validator(S) ->
   fun
-    ({K,insert,{V,force}}) -> {insert,K,V,getter(S,K)};
-    ({K,insert,{V,OV}})    -> {insert,K,V,assert(S,K,OV)};
-    ({K,delete,force})     -> {delete,K,getter(S,K)};
-    ({K,delete,OV})        -> {delete,K,assert(S,K,OV)}
+    ({insert,K,{V,force}}) -> {insert,K,V,getter(S,K)};
+    ({insert,K,{V,OV}})    -> {insert,K,V,assert(S,K,OV)};
+    ({delete,K,force})     -> {delete,K,getter(S,K)};
+    ({delete,K,OV})        -> {delete,K,assert(S,K,OV)}
   end.
 
 assert(S,K,OV) ->

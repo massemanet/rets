@@ -2,7 +2,7 @@
 %%% Created : 27 Jun 2012 by mats cronqvist <masse@klarna.com>
 
 %% @doc
-%% a rest wrapper around ets
+%% a rest wrapper around ets/leveldb
 %% @end
 
 -module(rets).
@@ -75,26 +75,27 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("GET"   ,Key,["gauge"],_)  -> g(r,[{gauge,Key}]);
-x("GET"   ,Key,["keys"] ,_)  -> g(r,[{keys,Key}]);
-x("GET"   ,Key,["next"] ,_)  -> g(r,[{next,Key}]);
-x("GET"   ,Key,["prev"] ,_)  -> g(r,[{prev,Key}]);
-x("GET"   ,Key,["multi"],_)  -> g(r,[{multi,Key}]);
-x("GET"   ,Key,["single"],_) -> g(r,[{single,Key}]);
-x("GET"   ,Key,[]        ,_) -> g(r,[{single,Key}]);
+%% map http -> operations
+x("GET"   ,Key,["gauge"],_)  -> g([{gauge,Key}]);
+x("GET"   ,Key,["keys"] ,_)  -> g([{keys,Key}]);
+x("GET"   ,Key,["next"] ,_)  -> g([{next,Key}]);
+x("GET"   ,Key,["prev"] ,_)  -> g([{prev,Key}]);
+x("GET"   ,Key,["multi"],_)  -> g([{multi,Key}]);
+x("GET"   ,Key,["single"],_) -> g([{single,Key}]);
+x("GET"   ,Key,[]        ,_) -> g([{single,Key}]);
 
-x("PUT"   ,Key,[]       ,R)  -> g(w,[{insert,Key,dbl(body(R))}]);
-x("PUT"   ,Key,["force"],R)  -> g(w,[{insert,Key,body(R)}]);
-x("PUT"   ,Key,["gauge"],_)  -> g(w,[{mk_gauge,Key}]);
-x("PUT"   ,Key,["bump"] ,_)  -> g(w,[{bump,Key}]);
-x("PUT"   ,Key,["reset"],_)  -> g(w,[{reset,Key}]);
+x("PUT"   ,Key,[]       ,R)  -> g([{insert,Key,body(R)}]);
+x("PUT"   ,Key,["force"],R)  -> g([{insert,Key,{body(R),force}}]);
+x("PUT"   ,Key,["gauge"],_)  -> g([{mk_gauge,Key}]);
+x("PUT"   ,Key,["bump"] ,_)  -> g([{bump,Key}]);
+x("PUT"   ,Key,["reset"],_)  -> g([{reset,Key}]);
 
-x("DELETE",Key,[]       ,R)  -> g(w,[{delete,Key,body(R)}]);
-x("DELETE",Key,["gauge"],_)  -> g(w,[{del_gauge,Key}]);
-x("DELETE",Key,["force"],_)  -> g(w,[{delete,Key}]);
+x("DELETE",Key,[]       ,R)  -> g([{delete,Key,body(R)}]);
+x("DELETE",Key,["gauge"],_)  -> g([{del_gauge,Key}]);
+x("DELETE",Key,["force"],_)  -> g([{delete,Key,force}]);
 
-x("POST"  ,[] ,["write"],R)  -> g(w,body(R));
-x("POST"  ,[] ,["read"] ,R)  -> g(r,body(R));
+x("POST"  ,[] ,["write"],R)  -> g(body(R));
+x("POST"  ,[] ,["read"] ,R)  -> g(body(R));
 
 x("TRACE" ,_    ,_        ,_)  -> throw({405,"method not allowed"});
 x(Meth    ,URI  ,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).
@@ -110,8 +111,6 @@ body(Req) ->
     false-> []
   end.
 
-dbl([V,OV]) -> {V,OV}.
-
 method(Req) ->
   {Method,_} = cowboy_req:method(Req),
   string:to_upper(binary_to_list(Method)).
@@ -120,39 +119,47 @@ uri(Req) ->
   {URI,_} = cowboy_req:path(Req),
   URI.
 
-g(F,Args) ->
-  case gen_server:call(rets_handler,{F,Args}) of
+g(Ops) ->
+  {F,_,ValidatedOps} = chk_ops(Ops),
+  case gen_server:call(rets_handler,{F,ValidatedOps}) of
     {ok,Reply} -> Reply;
     {Status,R} -> throw({Status,R})
   end.
 
-chk_body(RorW,Body) ->
-  lists:sort(lists:map(fun(E) -> chk_bp(RorW,E) end,Body)).
+%% validate operations
+%% State is {r|w,Key,[ops()]}
+chk_ops(Ops) ->
+  lists:foldl(fun chk_op/2,{'',<<>>,[]},lists:keysort(2,Ops)).
 
-chk_bp(r,[<<"single">>,K])        -> emit_bp(r,single,K);
-chk_bp(r,[<<"multi">>,K])         -> emit_bp(r,multi,K);
-chk_bp(r,[<<"next">>,K])          -> emit_bp(r,next,K);
-chk_bp(r,[<<"prev">>,K])          -> emit_bp(r,prev,K);
-chk_bp(r,[<<"gauge">>,K])         -> emit_bp(r,gauge,K);
-chk_bp(r,[<<"keys">>,K])          -> emit_bp(r,keys,K);
-chk_bp(w,[<<"insert">>,K,{V,OV}]) -> chk_bp(w,[<<"insert">>,K,V,OV]);
-chk_bp(w,[<<"insert">>,K,V])      -> chk_bp(w,[<<"insert">>,K,V,force]);
-chk_bp(w,[<<"delete">>,K])        -> chk_bp(w,[<<"delete">>,K,force]);
-chk_bp(w,[<<"insert">>,K,V,OV])   -> emit_bp(w,insert,K,{V,OV});
-chk_bp(w,[<<"bump">>,K])          -> emit_bp(w,bump,K,force);
-chk_bp(w,[<<"reset">>,K])         -> emit_bp(w,reset,K,force);
-chk_bp(w,[<<"mk_gauge">>,K])      -> emit_bp(w,mk_gauge,K,force);
-chk_bp(w,[<<"del_gauge">>,K])     -> emit_bp(w,del_gauge,K,force);
-chk_bp(w,[<<"delete">>,K,V])      -> emit_bp(w,delete,K,V);
-chk_bp(RorW,What)                 -> throw({400,{bad_request,{RorW,What}}}).
+chk_op([<<"insert">>,K,{V,OV}],S) -> chk_op([<<"insert">>,K,V,OV],S);
+chk_op([<<"insert">>,K,V],S)      -> chk_op([<<"insert">>,K,V,force],S);
+chk_op([<<"delete">>,K],S)        -> chk_op([<<"delete">>,K,force],S);
+chk_op([<<"single">>,K],S)        -> emit_r_op(single,K,S);
+chk_op([<<"multi">>,K],S)         -> emit_r_op(multi,K,S);
+chk_op([<<"next">>,K],S)          -> emit_r_op(next,K,S);
+chk_op([<<"prev">>,K],S)          -> emit_r_op(prev,K,S);
+chk_op([<<"gauge">>,K],S)         -> emit_r_op(gauge,K,S);
+chk_op([<<"keys">>,K],S)          -> emit_r_op(keys,K,S);
+chk_op([<<"insert">>,K,V,OV],S)   -> emit_w_op(insert,K,{V,OV},S);
+chk_op([<<"bump">>,K],S)          -> emit_w_op(bump,K,force,S);
+chk_op([<<"reset">>,K],S)         -> emit_w_op(reset,K,force,S);
+chk_op([<<"mk_gauge">>,K],S)      -> emit_w_op(mk_gauge,K,force,S);
+chk_op([<<"del_gauge">>,K],S)     -> emit_w_op(del_gauge,K,force,S);
+chk_op([<<"delete">>,K,V],S)      -> emit_w_op(delete,K,V,S);
+chk_op(What,_S)                   -> throw({400,{bad_op,What}}).
 
-emit_bp(r,Op,K)   -> {chk_key(r,K),Op}.
-emit_bp(w,Op,K,V) -> {chk_key(w,K),Op,V}.
+emit_r_op(Op,K,{w,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
+emit_r_op(Op,K,{r,K,_}) -> throw({400,{key_appears_twice,Op,K}});
+emit_r_op(Op,K,{r,K,A}) -> chk_key(r,K), {r,K,[{Op,K}|A]}.
 
-chk_key(RorW,Key) -> lists:map(fun(E) -> chkk_el(RorW,E) end,mk_ekey(Key)).
+emit_w_op(Op,K,_,{r,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
+emit_w_op(Op,K,_,{w,K,_}) -> throw({400,{key_appears_twice,Op,K}});
+emit_w_op(Op,K,V,{w,K,A}) -> chk_key(w,K), {w,K,[{Op,K,V}|A]}.
+
+chk_key(RorW,Key) -> lists:foreach(fun(E) -> chkk_el(RorW,E) end,mk_ekey(Key)).
 chkk_el(w,".") -> throw({400,key_element_is_period});
-chkk_el(r,".") -> ".";
-chkk_el(_,El)  -> lists:map(fun good_char/1,El).
+chkk_el(r,".") -> ok;
+chkk_el(_,El)  -> lists:foreach(fun good_char/1,El).
 
 mk_ekey(Key) -> string:tokens(binary_to_list(Key),"/").
 
