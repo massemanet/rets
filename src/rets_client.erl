@@ -9,7 +9,7 @@
 -export([get/1,get/2,get/3,get/4,
          delete/2,delete/3,
          put/2,put/4,
-         post/3,
+         post/2,
          trace/1,trace/2]).
 
 -define(is_string(S), S=="";is_integer(hd(S))).
@@ -49,13 +49,11 @@ put(Host,Tab,Key,PL) ->
 put(Host,Tab,Key,Headers,PL) ->
   httpc_request(put,Host,Tab,Key,Headers,PL).
 
-post(Host,PL,read) ->
-  posti(Host,PL,[{"rets","read"}]);
-post(Host,PL,write) ->
-  posti(Host,PL,[{"rets","write"}]).
+post(Host,PL) ->
+  post(Host,PL,[]).
 
 %% internal
-posti(Host,PL,Headers) ->
+post(Host,PL,Headers) ->
   httpc_request(post,Host,"","",Headers,PL).
 
 trace(Host) ->
