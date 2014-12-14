@@ -47,7 +47,7 @@ delete_file(Op,File) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 r(S,Ops) ->
-  {{lists:foldl(mk_reader(S),[],Ops)},
+  {{lists:flatmap(mk_reader(S),Ops)},
    S}.
 
 w(S,Ops) ->
@@ -56,8 +56,8 @@ w(S,Ops) ->
 
 mk_reader(S) ->
   fun
-    ({single,K},A) -> [wgetter(S,single,K)|A];
-    ({multi,K},A)  -> wgetter(S,multi,K)++A
+    ({single,K}) -> wgetter(S,single,K);
+    ({multi,K})  -> wgetter(S,multi,K)
   end.
 
 mk_validator(S) ->
@@ -76,31 +76,26 @@ assert(S,K,OV) ->
 
 mk_committer(S) ->
   fun
-    ({insert,Key,Val,{_,OV}}) -> {inserter(S,Key,Val),OV};
-    ({delete,Key,{_,OV}})     -> {deleter(S,Key),OV}
+    ({insert,Key,Val,{_,OV}}) -> inserter(S,Key,Val),{Key,OV};
+    ({delete,Key,{_,OV}})     -> deleter(S,Key),{Key,OV}
   end.
 
 %% get data from leveldb.
 inserter(S,Key,Val) ->
-  Bkey = mk_bkey(Key),
-  lvl_put(S,Bkey,pack_val(Val)),
-  Bkey.
+  lvl_put(S,Key,pack_val(Val)).
 
 deleter(S,Key) ->
-  Bkey = mk_bkey(Key),
-  lvl_delete(S,Bkey),
-  Bkey.
+  lvl_delete(S,Key).
 
 %% keys without wildcards
 getter(S,Key) ->
-  Bkey = mk_bkey(Key),
-  {Bkey,lvl_get(S,Bkey)}.
+  {Key,lvl_get(S,Key)}.
 
 %% allow wildcards (".") in keys
 wgetter(S,single,Key) ->
   case wgetter(S,multi,Key) of
-    [{Bkey,V}] -> [{Bkey,V}];
-    _       -> throw({404,{multiple_hits,Key}})
+    [{Key,V}] -> [{Key,V}];
+    _         -> throw({404,{multiple_hits,Key}})
   end;
 wgetter(S,multi,Key) ->
   case getter(S,Key) of
@@ -109,20 +104,22 @@ wgetter(S,multi,Key) ->
         [] -> throw({404,{no_such_key,Key}});
         As -> As
       end;
-    {Bkey,Val} ->
-      [{Bkey,Val}]
+    {Key,Val} ->
+      [{Key,Val}]
   end.
 
 next(S,Key,WKey,Acc) ->
   case nextprev(S,{next,Key}) of
     end_of_table -> lists:reverse(Acc);
-    {Key,V} ->
-      case key_match(WKey,Key) of
-        true -> next(S,Key,WKey,[{mk_bkey(Key),unpack_val(V)}|Acc]);
+    {NKey,V} ->
+      case key_match(WKey,NKey) of
+        true -> next(S,NKey,WKey,[{NKey,unpack_val(V)}|Acc]);
         false-> Acc
       end
   end.
 
+-define(binp(B1,B2), (is_binary(B1) andalso is_binary(B2))).
+key_match(B1,B2) when ?binp(B1,B2) -> key_match(mk_ekey(B1),mk_ekey(B2));
 key_match([],[])               -> true;
 key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
 key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
@@ -136,7 +133,7 @@ nextprev(S,OP,Key) ->
 
 nextprev(S,{OP,Key}) ->
   Iter = lvl_iter(S,key_vals),
-  check_np(OP,lvl_mv_iter(Iter,mk_bkey(Key)),Iter,Key).
+  check_np(OP,lvl_mv_iter(Iter,Key),Iter,Key).
 
 check_np(prev,invalid_iterator,Iter,Key) ->
   case lvl_mv_iter(Iter,last) of
