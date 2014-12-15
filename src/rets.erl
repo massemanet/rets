@@ -149,7 +149,6 @@ chk_op({<<"delete">>,K,V},S)      -> emit_w_op(delete,K,V,S);
 chk_op(What,_S)                   -> throw({400,{bad_op,What}}).
 
 emit_r_op(Op,K,{w,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
-emit_r_op(Op,K,{r,K,_}) -> throw({400,{key_appears_twice,Op,K}});
 emit_r_op(Op,K,{_,_,A}) -> chk_key(r,K), {r,K,[{Op,K}|A]}.
 
 emit_w_op(Op,K,_,{r,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
