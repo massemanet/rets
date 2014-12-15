@@ -226,6 +226,35 @@ t01(Backend) ->
                                 [multi,ccc]])).
 
 
+%t02_ets_test()     -> t02(ets).
+t02_leveldb_test() -> t02(leveldb).
+t02(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,[{"aaa/1/x",null},
+                     {"bbb",null},
+                     {"ccc",null},
+                     {"ddd",null}]},
+               rets_client:post(localhost,
+                                [[insert,'aaa/1/x',"AAA"++[223]],
+                                 [insert,bbb,bBbB],
+                                 [insert,ccc,123.1],
+                                 [insert,ddd,[{a,"A"},{b,b},{c,123.3}]]])),
+  ?assertEqual({200,[]},
+               rets_client:post(localhost,
+                               [[next,'aaa/./x'],
+                                [next,'aaa/1/x'],
+                                [next,bbb],
+                                [prev,ccc],
+                                [prev,ddd]])),
+
+  ?assertMatch({409,_},
+               rets_client:post(localhost,
+                                [[next,ddd]])),
+
+  ?assertMatch({409,_},
+               rets_client:post(localhost,
+                                [[prev,'aaa/1/x']])).
+
 restart_rets(Backend) ->
   application:stop(rets),
   {ok,_} = start(Backend).
