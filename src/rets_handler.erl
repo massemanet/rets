@@ -31,6 +31,9 @@ init(Args) ->
   process_flag(trap_exit, true),
   do_init(Args).
 terminate(shutdown,State) ->
+  do_terminate(State);
+terminate(Crash,State) ->
+  print_crash(Crash),
   do_terminate(State).
 
 code_change(_OldVsn,State,_Extra) ->
@@ -50,6 +53,27 @@ handle_cast(What,State) ->
 handle_info(What,State) ->
   erlang:display({info,What}),
   {noreply,State}.
+
+%% utility to print a crash
+print_crash({Reason,Stack}) ->
+  io:fwrite("~n"),
+  io:fwrite("CRASH in ~w: ~w~n",[?MODULE,Reason]),
+  io:fwrite("~n"),
+  lists:foreach(fun print_stack/1,Stack),
+  io:fwrite("~n").
+
+print_stack({M,F,A,I}) ->
+  case is_integer(A) of
+    true  -> io:fwrite("~w:~w/~w",[M,F,A]);
+    false ->
+      As = string:join([io_lib:fwrite("~p",[E]) || E <- A],","),
+      io:fwrite("~w:~w(~s)",[M,F,As])
+  end,
+  File = proplists:get_value(file,I,""),
+  case proplists:get_value(line,I,"") of
+    ""    -> io:fwrite("~n");
+    Line  -> io:fwrite("  (~s:~w)~n",[File,Line])
+  end.
 
 %% utility to print state
 expand_recs(List) when is_list(List) ->
