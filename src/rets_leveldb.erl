@@ -134,7 +134,7 @@ key_match(_,_)                 -> false.
 
 nextprev(S,OP,Key) ->
   case nextprev(S,{OP,Key}) of
-    end_of_table -> throw({409,end_of_table});
+    end_of_table -> throw({409,{end_of_table,mk_lkey(Key)}});
     {K,V}        -> {[{K,unpack_val(V)}]}
   end.
 
@@ -188,8 +188,10 @@ unpack_val(Val) ->
 
 %% key mangling
 mk_ekey(Bin) ->
-  string:tokens(binary_to_list(Bin),"/").
+  string:tokens(mk_lkey(Bin),"/").
 
+mk_lkey(Bin) ->
+  binary_to_list(Bin).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% leveldb API
 
