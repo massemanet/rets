@@ -160,7 +160,8 @@ chkk_el(w,".") -> throw({400,key_element_is_period});
 chkk_el(r,".") -> ok;
 chkk_el(_,El)  -> lists:foreach(fun good_char/1,El).
 
-mk_ekey(Key) -> string:tokens(binary_to_list(Key),"/").
+mk_ekey(Key) when is_binary(Key)  -> string:tokens(binary_to_list(Key),"/");
+mk_ekey(Key) -> throw({400,{key_has_bad_type,Key}}).
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
