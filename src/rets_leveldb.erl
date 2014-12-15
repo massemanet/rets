@@ -135,7 +135,7 @@ key_match(_,_)                 -> false.
 nextprev(S,OP,Key) ->
   case nextprev(S,{OP,Key}) of
     end_of_table -> throw({409,{end_of_table,mk_lkey(Key)}});
-    {K,V}        -> {[{K,unpack_val(V)}]}
+    {K,V}        -> [{K,unpack_val(V)}]
   end.
 
 nextprev(S,{OP,Key}) ->
