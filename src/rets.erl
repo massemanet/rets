@@ -296,6 +296,21 @@ t04(Backend) ->
   ?assertEqual({200,[]},
                rets_client:post(localhost,[[keys,"bla"]])).
 
+%t05_ets_test()     -> t05(ets).
+t05_leveldb_test() -> t05(leveldb).
+t05(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,[{"bla",null}]},
+               rets_client:post(localhost,[[bump,"bla"]])),
+  ?assertMatch({400,_},
+               rets_client:post(localhost,[[delete,"bla",2]])),
+  ?assertEqual({200,[{"bla",null}]},
+               rets_client:post(localhost,[[keys,"bla"]])),
+  ?assertEqual({200,[{"bla",1}]},
+               rets_client:post(localhost,[[delete,"bla",1]])),
+  ?assertEqual({200,[]},
+               rets_client:post(localhost,[[keys,"bla"]])).
+
 restart_rets(Backend) ->
   application:stop(rets),
   {ok,_} = start(Backend).
