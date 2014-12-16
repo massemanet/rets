@@ -47,11 +47,11 @@ delete_file(Op,File) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 r(S,Ops) ->
-  {{lists:flatmap(mk_reader(S),Ops)},
+  {lists:flatmap(mk_reader(S),Ops),
    S}.
 
 w(S,Ops) ->
-  {{lists:map(mk_committer(S),lists:map(mk_validator(S),Ops))},
+  {lists:map(mk_committer(S),lists:map(mk_validator(S),Ops)),
    S}.
 
 mk_reader(S) ->
@@ -69,8 +69,8 @@ mk_validator(S) ->
     ({insert,K,{V,OV}})    -> {insert,K,V,assert(S,K,OV)};
     ({delete,K,force})     -> {delete,K,getter(S,K)};
     ({delete,K,OV})        -> {delete,K,assert(S,K,OV)};
-    ({bump,K,force})       -> {bump,K,1};
-    ({reset,K,force})      -> {reset,K,0}
+    ({bump,K,I})           -> {bump,K,I};
+    ({reset,K,Z})          -> {reset,K,Z}
   end.
 
 assert(S,K,OV) ->
@@ -173,12 +173,14 @@ fold_loop(K,KeyW,Iter,Acc) ->
 
 update_counter(S,Key,Incr) ->
   case lvl_get(S,Key) of
-    null -> inserter(S,Key,Incr);
-    Val  -> inserter(S,Key,Val+Incr)
+    null -> inserter(S,Key,Incr), {Key,null};
+    Val  -> inserter(S,Key,Val+Incr),{Key,Val}
   end.
 
 reset_counter(S,Key,Val) ->
-  inserter(S,Key,Val).
+  OldVal = lvl_get(S,Key),
+  inserter(S,Key,Val),
+  {Key,OldVal}.
 
 %% data packing
 pack_val(Val) ->
