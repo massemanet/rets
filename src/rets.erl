@@ -331,6 +331,19 @@ t06(Backend) ->
   ?assertEqual({200,[{"baz",2}]},
                rets_client:get(localhost,"baz")).
 
+%t07_ets_test()     -> t07(ets).
+t07_leveldb_test() -> t07(leveldb).
+t07(Backend) ->
+  restart_rets(Backend),
+  ?assertMatch({404,_},
+               rets_client:get(localhost,"quux")),
+  ?assertEqual({200,[{"quux/1",null}]},
+               rets_client:put(localhost,"quux/1",1)),
+  ?assertEqual({200,[{"quux/2",null}]},
+               rets_client:put(localhost,"quux/2",2)),
+  ?assertMatch({404,_},
+               rets_client:get(localhost,"quux/.")).
+
 restart_rets(Backend) ->
   application:stop(rets),
   {ok,_} = start(Backend).
