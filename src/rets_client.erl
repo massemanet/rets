@@ -6,9 +6,9 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/1,get/2,get/3,get/4,
-         delete/2,delete/3,
-         put/2,put/4,
+-export([get/1,get/2,get/3,
+         delete/2,
+         put/3,
          post/2,
          trace/1,trace/2]).
 
@@ -16,45 +16,39 @@
 
 get(Host) ->
   atomize(get(Host,"")).
-get(Host,Tab) ->
-  get(Host,Tab,"").
-get(Host,Tab,Key) ->
-  get(Host,Tab,Key,[],[]).
-get(Host,Tab,Key,next) ->
-  get(Host,Tab,Key,[{"rets","next"}],[]);
-get(Host,Tab,Key,prev) ->
-  get(Host,Tab,Key,[{"rets","prev"}],[]);
-get(Host,Tab,Key,multi) ->
-  get(Host,Tab,Key,[{"rets","multi"}],[]).
+get(Host,Key) ->
+  get(Host,Key,[],[]).
+get(Host,Key,next) ->
+  get(Host,Key,[{"rets","next"}],[]);
+get(Host,Key,prev) ->
+  get(Host,Key,[{"rets","prev"}],[]);
+get(Host,Key,multi) ->
+  get(Host,Key,[{"rets","multi"}],[]).
 
 %% internal
-get(Host,Tab,Key,Headers,[]) ->
-  httpc_request(get,Host,Tab,Key,Headers).
+get(Host,Key,Headers,[]) ->
+  httpc_request(get,Host,Key,Headers).
 
-delete(Host,Tab) ->
-  delete(Host,Tab,"").
-delete(Host,Tab,Key) ->
-  httpc_request(delete,Host,Tab,Key,[]).
+delete(Host,Key) ->
+  httpc_request(delete,Host,Key,[]).
 
-put(Host,Tab) ->
-  put(Host,Tab,"",[]).
-put(Host,Tab,Key,counter) ->
-  put(Host,Tab,Key,[{"rets","counter"}],[]);
-put(Host,Tab,Key,reset) ->
-  put(Host,Tab,Key,[{"rets","reset"}],[]);
-put(Host,Tab,Key,PL) ->
-  put(Host,Tab,Key,[],PL).
+put(Host,Key,counter) ->
+  put(Host,Key,[{"rets","counter"}],[]);
+put(Host,Key,reset) ->
+  put(Host,Key,[{"rets","reset"}],[]);
+put(Host,Key,PL) ->
+  put(Host,Key,[],PL).
 
 %% internal
-put(Host,Tab,Key,Headers,PL) ->
-  httpc_request(put,Host,Tab,Key,Headers,PL).
+put(Host,Key,Headers,PL) ->
+  httpc_request(put,Host,Key,Headers,PL).
 
 post(Host,PL) ->
   post(Host,PL,[]).
 
 %% internal
 post(Host,PL,Headers) ->
-  httpc_request(post,Host,"","",Headers,PL).
+  httpc_request(post,Host,"",Headers,PL).
 
 trace(Host) ->
   trace(Host,[]).
@@ -63,11 +57,11 @@ trace(Host,Headers) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-httpc_request(M,Host,Tab,Key,Headers) ->
-  httpc_request(M,Host,Tab,Key,Headers,[]).
-httpc_request(M,Host,Tab,Key,Headers,PL) ->
+httpc_request(M,Host,Key,Headers) ->
+  httpc_request(M,Host,Key,Headers,[]).
+httpc_request(M,Host,Key,Headers,PL) ->
   start_app(inets),
-  case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
+  case httpc_req(M,url(Host,Key),Headers,enc(prep(PL))) of
     {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
       case Status of
         200 -> {200,unprep(dec(Reply))};
@@ -77,18 +71,18 @@ httpc_request(M,Host,Tab,Key,Headers,PL) ->
       Error
   end.
 
-httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
+httpc_req(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
   httpc:request(M,{URL,Headers},[],[]);
-httpc_request(M,URL,Headers,PL) when M==post; M==put ->
+httpc_req(M,URL,Headers,PL) when M==post; M==put ->
   httpc:request(M,{URL,Headers,[],PL},[],[]).
 
 start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
 
-url(Host,Tab,Key) ->
+url(Host,Key) ->
   Prot = "http",
   Port = "7890",
-  Prot++"://"++to_list(Host)++":"++Port++"/"++to_list(Tab)++"/"++to_list(Key).
+  Prot++"://"++to_list(Host)++":"++Port++"/"++to_list(Key).
 
 to_list(X) when ?is_string(X) -> X;
 to_list(X) when is_binary(X)  -> binary_to_list(X);
