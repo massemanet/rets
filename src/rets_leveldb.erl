@@ -47,11 +47,11 @@ delete_file(Op,File) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 r(S,Ops) ->
-  {lists:flatmap(mk_reader(S),Ops),
+  {{lists:flatmap(mk_reader(S),Ops)},
    S}.
 
 w(S,Ops) ->
-  {lists:map(mk_committer(S),lists:map(mk_validator(S),Ops)),
+  {{lists:map(mk_committer(S),lists:map(mk_validator(S),Ops))},
    S}.
 
 mk_reader(S) ->
@@ -167,7 +167,7 @@ fold_loop(invalid_iterator,_,_,Acc) ->
   Acc;
 fold_loop(K,KeyW,Iter,Acc) ->
   case key_match(KeyW,K) of
-    true -> fold_loop(lvl_mv_iter(Iter,prefetch),KeyW,Iter,[K|Acc]);
+    true -> fold_loop(lvl_mv_iter(Iter,prefetch),KeyW,Iter,[{K,null}|Acc]);
     false-> Acc
   end.
 

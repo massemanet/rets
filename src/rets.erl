@@ -78,23 +78,23 @@ reply(Req) ->
 %% map http -> operations
 x("GET"   ,Key,["gauge"],_)  -> g([{gauge,Key}]);
 x("GET"   ,Key,["keys"] ,_)  -> g([{keys,Key}]);
-x("GET"   ,Key,["next"] ,_)  -> {g([{next,Key}])};
-x("GET"   ,Key,["prev"] ,_)  -> {g([{prev,Key}])};
-x("GET"   ,Key,["multi"],_)  -> {g([{multi,Key}])};
-x("GET"   ,Key,["single"],_) -> {g([{single,Key}])};
-x("GET"   ,Key,[]        ,_) -> {g([{single,Key}])};
+x("GET"   ,Key,["next"] ,_)  -> g([{next,Key}]);
+x("GET"   ,Key,["prev"] ,_)  -> g([{prev,Key}]);
+x("GET"   ,Key,["multi"],_)  -> g([{multi,Key}]);
+x("GET"   ,Key,["single"],_) -> g([{single,Key}]);
+x("GET"   ,Key,[]        ,_) -> g([{single,Key}]);
 
-x("PUT"   ,Key,[]       ,R)  -> {g([{insert,Key,body(R)}])};
-x("PUT"   ,Key,["force"],R)  -> {g([{insert,Key,{body(R),force}}])};
+x("PUT"   ,Key,[]       ,R)  -> g([{insert,Key,body(R)}]);
+x("PUT"   ,Key,["force"],R)  -> g([{insert,Key,{body(R),force}}]);
 x("PUT"   ,Key,["gauge"],_)  -> g([{mk_gauge,Key}]);
-x("PUT"   ,Key,["bump"] ,_)  -> {g([{bump,Key}])};
-x("PUT"   ,Key,["reset"],_)  -> {g([{reset,Key}])};
+x("PUT"   ,Key,["bump"] ,_)  -> g([{bump,Key}]);
+x("PUT"   ,Key,["reset"],_)  -> g([{reset,Key}]);
 
-x("DELETE",Key,[]       ,R)  -> {g([{delete,Key,body(R)}])};
-x("DELETE",Key,["gauge"],_)  -> {g([{del_gauge,Key}])};
-x("DELETE",Key,["force"],_)  -> {g([{delete,Key,force}])};
+x("DELETE",Key,[]       ,R)  -> g([{delete,Key,body(R)}]);
+x("DELETE",Key,["gauge"],_)  -> g([{del_gauge,Key}]);
+x("DELETE",Key,["force"],_)  -> g([{delete,Key,force}]);
 
-x("POST"  ,_  ,[] ,R)        -> {g(chk_body(body(R)))};
+x("POST"  ,_  ,[] ,R)        -> g(chk_body(body(R)));
 
 x("TRACE" ,_    ,_        ,_)  -> throw({405,"method not allowed"});
 x(Meth    ,URI  ,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).
@@ -126,6 +126,7 @@ uri(Req) ->
 g(Ops) ->
   {F,ValidatedOps} = chk_ops(Ops),
   case gen_server:call(rets_handler,{F,ValidatedOps}) of
+    {ok,{[]}}  -> [];
     {ok,Reply} -> Reply;
     {Status,R} -> throw({Status,R})
   end.
@@ -286,14 +287,14 @@ t03(Backend) ->
 t04_leveldb_test() -> t04(leveldb).
 t04(Backend) ->
   restart_rets(Backend),
-  ?assertEqual({200,[{"foo",null}]},
-               rets_client:post(localhost,[[bump,"foo"]])),
-  ?assertEqual({200,["foo"]},
-               rets_client:post(localhost,[[keys,"foo"]])),
-  ?assertEqual({200,[{"foo",1}]},
-               rets_client:post(localhost,[[delete,"foo"]])),
+  ?assertEqual({200,[{"bla",null}]},
+               rets_client:post(localhost,[[bump,"bla"]])),
+  ?assertEqual({200,[{"bla",null}]},
+               rets_client:post(localhost,[[keys,"bla"]])),
+  ?assertEqual({200,[{"bla",1}]},
+               rets_client:post(localhost,[[delete,"bla"]])),
   ?assertEqual({200,[]},
-               rets_client:post(localhost,[[keys,"foo"]])).
+               rets_client:post(localhost,[[keys,"bla"]])).
 
 restart_rets(Backend) ->
   application:stop(rets),
