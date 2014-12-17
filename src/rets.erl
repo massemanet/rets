@@ -244,6 +244,10 @@ t01(Backend) ->
 t02_leveldb_test() -> t02(leveldb).
 t02(Backend) ->
   restart_rets(Backend),
+  ?assertMatch({409,_},
+              rets_client:get(localhost,foo,prev)),
+  ?assertMatch({409,_},
+              rets_client:get(localhost,foo,next)),
   ?assertEqual({200,[{"aaa/1/x",null},
                      {"bbb",null},
                      {"ccc",null},
@@ -294,6 +298,8 @@ t03(Backend) ->
 t04_leveldb_test() -> t04(leveldb).
 t04(Backend) ->
   restart_rets(Backend),
+  ?assertEqual({200,[]},
+               rets_client:post(localhost,[[keys,"bla"]])),
   ?assertEqual({200,[{"bla",null}]},
                rets_client:post(localhost,[[bump,"bla"]])),
   ?assertEqual({200,[{"bla",null}]},
@@ -301,7 +307,19 @@ t04(Backend) ->
   ?assertEqual({200,[{"bla",1}]},
                rets_client:post(localhost,[[delete,"bla"]])),
   ?assertEqual({200,[]},
-               rets_client:post(localhost,[[keys,"bla"]])).
+               rets_client:post(localhost,[[keys,"bla"]])),
+  ?assertEqual({200,[{"bla/1",null}]},
+               rets_client:post(localhost,[[bump,"bla/1"]])),
+  ?assertEqual({200,[{"bla/1",null}]},
+               rets_client:post(localhost,[[keys,"bla/."]])),
+  ?assertEqual({200,[{"bla/2",null}]},
+               rets_client:post(localhost,[[bump,"bla/2"]])),
+  ?assertEqual({200,[{"bla/1",null},{"bla/2",null}]},
+               rets_client:post(localhost,[[keys,"bla/."]])),
+  ?assertEqual({200,[{"foo",null}]},
+               rets_client:post(localhost,[[bump,"foo"]])),
+  ?assertEqual({200,[{"bla/1",null},{"bla/2",null}]},
+               rets_client:post(localhost,[[keys,"bla/."]])).
 
 %t05_ets_test()     -> t05(ets).
 t05_leveldb_test() -> t05(leveldb).
