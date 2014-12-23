@@ -25,10 +25,8 @@ GET     KeyW  single             succeeds iff 1 Key      Val
 GET     KeyW  multi              multi read Key          [{Key,Val}]
 GET     KeyW  next               next                    {NextKey,NextVal}
 GET     KeyW  prev               prev                    {PrevKey,PrevVal}
-GET     KeyW  gauge              get all matching gauges [{Key,Size}]
 GET     KeyW  keys               get all matching keys   [Key]
 
-PUT     Key   gauge              create gauge            null|OldVal
 PUT     Key   force    Val       insert Key/Val          OldVal
 PUT     Key            [NV,OV]   ins Key/NV iff Key/OV   OldVal
 PUT     Key   bump               bump Val by one         NewInt=OldInt+1
@@ -37,7 +35,6 @@ PUT     Key   reset              reset Val to zero       OldInt
 POST          write    [WriteOp] mutate Keys             null
 POST          read     [ReadOp]  read many keys          [{Key,Val}|Val]
 
-DELETE  Key   gauge              delete gauge on Key     null|Value
 DELETE  Key   force              delete Key              null|Value
 DELETE  Key            Val       delete Key iff Key/Val  null
 
@@ -49,11 +46,10 @@ DELETE  Key            Val       delete Key iff Key/Val  null
   Val is a JSON object
   WriteOp is; ["delete",Key] | ["delete",Key,OldVal] |
               ["insert",Key,Val] | ["insert",Key,Val,OldVal] |
-              ["bump",Key] | ["reset",Key] |
-              ["mk_gauge",Key] | ["del_gauge",Key]
+              ["bump",Key] | ["reset",Key]
   ReadOp is; ["single",KeyW] | ["multi",KeyW] |
              ["next",KeyW] | ["prev",KeyW] |
-             ["gauge",KeyW] | ["keys",KeyW]
+             ["keys",KeyW]
 
 
 ## EXAMPLES

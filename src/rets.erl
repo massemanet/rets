@@ -76,7 +76,6 @@ reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
 %% map http -> operations
-x("GET"   ,Key,["gauge"],_)  -> g([{<<"gauge">>,Key}]);
 x("GET"   ,Key,["keys"] ,_)  -> g([{<<"keys">>,Key}]);
 x("GET"   ,Key,["next"] ,_)  -> g([{<<"next">>,Key}]);
 x("GET"   ,Key,["prev"] ,_)  -> g([{<<"prev">>,Key}]);
@@ -86,12 +85,10 @@ x("GET"   ,Key,[]        ,_) -> g([{<<"single">>,Key}]);
 
 x("PUT"   ,Key,[]       ,R)  -> g([{<<"insert">>,Key,body(R)}]);
 x("PUT"   ,Key,["force"],R)  -> g([{<<"insert">>,Key,{body(R),force}}]);
-x("PUT"   ,Key,["gauge"],_)  -> g([{<<"mk_gauge">>,Key}]);
 x("PUT"   ,Key,["bump"] ,_)  -> g([{<<"bump">>,Key}]);
 x("PUT"   ,Key,["reset"],_)  -> g([{<<"reset">>,Key}]);
 
 x("DELETE",Key,[]       ,R)  -> g([{<<"delete">>,Key,body(R)}]);
-x("DELETE",Key,["gauge"],_)  -> g([{<<"del_gauge">>,Key}]);
 x("DELETE",Key,["force"],_)  -> g([{<<"delete">>,Key,force}]);
 
 x("POST"  ,_  ,[] ,R)        -> g(chk_body(body(R)));
@@ -144,13 +141,10 @@ chk_op({<<"single">>    ,K},S)        -> emit_r_op(single    ,K,S);
 chk_op({<<"multi">>     ,K},S)        -> emit_r_op(multi     ,K,S);
 chk_op({<<"next">>      ,K},S)        -> emit_r_op(next      ,K,S);
 chk_op({<<"prev">>      ,K},S)        -> emit_r_op(prev      ,K,S);
-chk_op({<<"gauge">>     ,K},S)        -> emit_r_op(gauge     ,K,S);
 chk_op({<<"keys">>      ,K},S)        -> emit_r_op(keys      ,K,S);
 chk_op({<<"insert">>    ,K,V,OV},S)   -> emit_w_op(insert    ,K,{V,OV},S);
 chk_op({<<"bump">>      ,K},S)        -> emit_w_op(bump      ,K,1,S);
 chk_op({<<"reset">>     ,K},S)        -> emit_w_op(reset     ,K,0,S);
-chk_op({<<"mk_gauge">>  ,K},S)        -> emit_w_op(mk_gauge  ,K,force,S);
-chk_op({<<"del_gauge">> ,K},S)        -> emit_w_op(del_gauge ,K,force,S);
 chk_op({<<"delete">>    ,K,V},S)      -> emit_w_op(delete    ,K,V,S);
 chk_op(What,_S)                       -> throw({400,{bad_op,What}}).
 

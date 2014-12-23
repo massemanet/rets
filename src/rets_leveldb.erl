@@ -18,7 +18,6 @@
          dir}).
 
 init(Env) ->
-  ets:new(leveldb_gauges,[ordered_set,named_table,public]),
   Dir = proplists:get_value(table_dir,Env,"/tmp/rets/leveldb"),
   filelib:ensure_dir(Dir),
   #state{handle = lvl_open(Dir),
