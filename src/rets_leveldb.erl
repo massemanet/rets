@@ -86,18 +86,19 @@ mk_committer(S) ->
     ({reset,K,Z})             -> reset_counter(S,K,Z)
   end.
 
-%% get data from leveldb.
+%% write data to leveldb.
 inserter(S,Key,Val) ->
   lvl_put(S,Key,pack_val(Val)).
 
+%% delete data from leveldb.
 deleter(S,Key) ->
   lvl_delete(S,Key).
 
-%% keys without wildcards
+%% read keys without wildcards
 getter(S,Key) ->
   {Key,lvl_get(S,Key)}.
 
-%% allow wildcards (".") in keys
+%% read key with wildcards (".")
 wgetter(S,single,Key) ->
   case wgetter(S,multi,Key) of
     [{Key,V}] -> [{Key,V}];
@@ -106,7 +107,7 @@ wgetter(S,single,Key) ->
 wgetter(S,multi,Key) ->
   case getter(S,Key) of
     {_,null} ->
-      case next(S,Key,Key,[]) of
+      case get_next(S,Key,Key,[]) of
         [] -> throw({404,{no_such_key,Key}});
         As -> As
       end;
@@ -114,23 +115,17 @@ wgetter(S,multi,Key) ->
       [{Key,Val}]
   end.
 
-next(S,Key,WKey,Acc) ->
+get_next(S,Key,WKey,Acc) ->
   case nextprev(S,{next,Key}) of
     end_of_table -> lists:reverse(Acc);
     {NKey,V} ->
       case key_match(WKey,NKey) of
-        true -> next(S,NKey,WKey,[{NKey,unpack_val(V)}|Acc]);
+        true -> get_next(S,NKey,WKey,[{NKey,unpack_val(V)}|Acc]);
         false-> Acc
       end
   end.
 
--define(binp(B1,B2), (is_binary(B1) andalso is_binary(B2))).
-key_match(B1,B2) when ?binp(B1,B2) -> key_match(mk_ekey(B1),mk_ekey(B2));
-key_match([],[])               -> true;
-key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
-key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
-key_match(_,_)                 -> false.
-
+% get next/prev key
 nextprev(S,OP,Key) ->
   case nextprev(S,{OP,Key}) of
     end_of_table -> throw({409,{end_of_table,mk_lkey(Key)}});
@@ -180,6 +175,14 @@ reset_counter(S,Key,Val) ->
   OldVal = lvl_get(S,Key),
   inserter(S,Key,Val),
   {Key,OldVal}.
+
+% does key match wild_key?
+-define(binp(BW,B), (is_binary(WB) andalso is_binary(B))).
+key_match(WB,B) when ?binp(WB,B) -> key_match(mk_ekey(WB),mk_ekey(B));
+key_match([],[])               -> true;
+key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
+key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
+key_match(_,_)                 -> false.
 
 %% data packing
 pack_val(Val) ->
