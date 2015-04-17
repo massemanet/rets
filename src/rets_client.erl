@@ -13,6 +13,8 @@
          trace/1,trace/2]).
 
 -define(is_string(S), S=="";is_integer(hd(S))).
+-define(http_timeout, infinity).
+-define(http_opts,    [{max_connections, 10000}]).
 
 get(Host) ->
   atomize(get(Host,"")).
@@ -62,21 +64,21 @@ trace(Host,Headers) ->
 httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
 httpc_request(M,Host,Tab,Key,Headers,PL) ->
-  start_app(inets),
+  start_app(lhttpc),
   case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
-    {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
+    {ok,{{Status,_StatusText},_Headers,Reply}} ->
       case Status of
         200 -> {200,unprep(dec(Reply))};
-        _   -> {Status,Reply}
+        _   -> {Status,binary_to_list(Reply)}
       end;
     Error->
       Error
   end.
 
 httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
-  httpc:request(M,{URL,Headers},[],[]);
+  lhttpc:request(URL, M, Headers, [], ?http_timeout, ?http_opts);
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
-  httpc:request(M,{URL,Headers,[],PL},[],[]).
+  lhttpc:request(URL, M, Headers, PL, ?http_timeout, ?http_opts).
 
 start_app(M) ->
   [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
