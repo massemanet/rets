@@ -40,6 +40,8 @@ delete(Host,Tab,Key) ->
 
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
+put(Host,Tab,Key,{counter,L,H}) ->
+  put(Host,Tab,Key,[{"rets",string:join(["counter",s(L),s(H)],",")}],[],[]);
 put(Host,Tab,Key,counter) ->
   put(Host,Tab,Key,[{"rets","counter"}],[],[]);
 put(Host,Tab,Key,reset) ->
@@ -133,3 +135,6 @@ enc(Term) ->
 
 dec(Term) ->
   jiffy:decode(Term).
+
+s(Integer) ->
+  integer_to_list(Integer).

@@ -27,19 +27,21 @@ init(_Env)        -> #state{}.
 terminate(_State) -> ok.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])       -> creat(S,Tab).
-delete(S ,[Tab])       -> delet(S,Tab);
-delete(S ,[Tab,Key])   -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
-sizes(S  ,[])          -> {siz(S),S}.
-keys(S   ,[Tab])       -> {key_getter(tab(Tab)),S}.
-insert(S ,[Tab,KVs])   -> {ins(tab(Tab),[{key_e2i(i,K),V} || {K,V} <- KVs]),S};
-insert(S ,[Tab,K,V])   -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
-bump(S   ,[Tab,Key,I]) -> {update_counter(tab(Tab),key_e2i(i,Key),I),S}.
-reset(S  ,[Tab,Key,I]) -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
-next(S   ,[Tab,Key])   -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
-prev(S   ,[Tab,Key])   -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
-multi(S  ,[Tab,Key])   -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
-single(S ,[Tab,Key])   -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+create(S ,[Tab])         -> creat(S,Tab).
+delete(S ,[Tab])         -> delet(S,Tab);
+delete(S ,[Tab,Key])     -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
+sizes(S  ,[])            -> {siz(S),S}.
+keys(S   ,[Tab])         -> {key_getter(tab(Tab)),S}.
+insert(S ,[Tab,KVs])     -> {ins(tab(Tab),[{key_e2i(i,K),V}
+                                           || {K,V} <- KVs]),S};
+insert(S ,[Tab,K,V])     -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
+bump(S   ,[Tab,Key,I])   -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
+bump(S   ,[Tab,Key,L,H]) -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
+reset(S  ,[Tab,Key,I])   -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
+next(S   ,[Tab,Key])     -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
+prev(S   ,[Tab,Key])     -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
+multi(S  ,[Tab,Key])     -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
+single(S ,[Tab,Key])     -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
 
 creat(S,Tab) ->
   case lists:member(Tab,S#state.tables) of
@@ -100,6 +102,11 @@ deleter(Tab,Key) ->
 update_counter(Tab,Key,Incr) ->
   try ets:update_counter(Tab,Key,Incr)
   catch _:_ -> reset_counter(Tab,Key,Incr)
+  end.
+
+update_counter(Tab,Key,Low,High) ->
+  try ets:update_counter(Tab,Key,{2,1,High,Low})
+  catch _:_ -> reset_counter(Tab,Key,Low)
   end.
 
 reset_counter(Tab,Key,Begin) ->

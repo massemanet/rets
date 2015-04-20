@@ -54,19 +54,20 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])       -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])       -> {delete_tab(S,tab_name(Tab)),S};
-delete(S ,[Tab,Key])   -> {deleter(S,tab(Tab),Key),S}.
-sizes(S  ,[])          -> {siz(),S}.
-keys(S   ,[Tab])       -> {key_getter(S,tab(Tab)),S}.
-insert(S ,[Tab,KVs])   -> {ins(S,tab(Tab),KVs),S};
-insert(S ,[Tab,K,V])   -> {ins(S,tab(Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I]) -> {update_counter(S,tab(Tab),Key,I),S}.
-reset(S  ,[Tab,Key,I]) -> {reset_counter(S,tab(Tab),Key,I),S}.
-next(S   ,[Tab,Key])   -> {nextprev(S,next,tab(Tab),Key),S}.
-prev(S   ,[Tab,Key])   -> {nextprev(S,prev,tab(Tab),Key),S}.
-multi(S  ,[Tab,Key])   -> {getter(S,multi,tab(Tab),Key),S}.
-single(S ,[Tab,Key])   -> {getter(S,single,tab(Tab),Key),S}.
+create(S ,[Tab])         -> {create(tab_name(Tab)),S}.
+delete(S ,[Tab])         -> {delete_tab(S,tab_name(Tab)),S};
+delete(S ,[Tab,Key])     -> {deleter(S,tab(Tab),Key),S}.
+sizes(S  ,[])            -> {siz(),S}.
+keys(S   ,[Tab])         -> {key_getter(S,tab(Tab)),S}.
+insert(S ,[Tab,KVs])     -> {ins(S,tab(Tab),KVs),S};
+insert(S ,[Tab,K,V])     -> {ins(S,tab(Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])   -> {update_counter(S,tab(Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H]) -> {update_counter(S,tab(Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])   -> {reset_counter(S,tab(Tab),Key,I),S}.
+next(S   ,[Tab,Key])     -> {nextprev(S,next,tab(Tab),Key),S}.
+prev(S   ,[Tab,Key])     -> {nextprev(S,prev,tab(Tab),Key),S}.
+multi(S  ,[Tab,Key])     -> {getter(S,multi,tab(Tab),Key),S}.
+single(S ,[Tab,Key])     -> {getter(S,single,tab(Tab),Key),S}.
 
 create(Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of
@@ -108,6 +109,13 @@ update_counter(S,Tab,Key,Incr) ->
   case lvl_get(S,tk(Tab,Key)) of
     not_found -> ins_overwrite(S,Tab,Key,Incr);
     Val       -> ins_overwrite(S,Tab,Key,Val+Incr)
+  end.
+
+update_counter(S,Tab,Key,Low,High) ->
+  case lvl_get(S,tk(Tab,Key)) of
+    not_found           -> ins_overwrite(S,Tab,Key,Low);
+    Val when Val < High -> ins_overwrite(S,Tab,Key,Val+1);
+    _                   -> ins_overwrite(S,Tab,Key,Low)
   end.
 
 reset_counter(S,Tab,Key,Val) ->

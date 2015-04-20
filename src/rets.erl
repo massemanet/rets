@@ -74,21 +74,23 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("PUT",   [Tab]    ,[],_)          -> g({create,[Tab]});
-x("PUT",   [Tab|Key],[],R)          -> g({insert,[Tab,chkk(Key),body(R)]});
-x("PUT",   [Tab|Key],["counter"],_) -> g({bump,  [Tab,chkk(Key),1]});
-x("PUT",   [Tab|Key],["reset"],_)   -> g({reset, [Tab,chkk(Key),0]});
-x("GET",   []       ,[],_)          -> g({sizes, []});
-x("GET",   [Tab]    ,[],_)          -> g({keys,  [Tab]});
-x("GET",   [Tab|Key],[],_)          -> g({single,[Tab,Key]});
-x("GET",   [Tab|Key],["multi"],_)   -> g({multi, [Tab,Key]});
-x("GET",   [Tab|Key],["next"],_)    -> g({next,  [Tab,Key]});
-x("GET",   [Tab|Key],["prev"],_)    -> g({prev,  [Tab,Key]});
-x("POST",  [Tab]    ,[],R)          -> g({insert,[Tab,chkb(body(R))]});
-x("DELETE",[Tab]    ,[],_)          -> g({delete,[Tab]});
-x("DELETE",[Tab|Key],[],_)          -> g({delete,[Tab,Key]});
-x("TRACE",_,_,_)                    -> throw({405,"method not allowed"});
-x(Meth,URI,Headers,Bdy)             -> throw({404,{Meth,URI,Headers,Bdy}}).
+x("PUT",   [Tab]    ,[],_)              -> g({create,[Tab]});
+x("PUT",   [Tab|Key],[],R)              -> g({insert,[Tab,chkk(Key),body(R)]});
+x("PUT",   [Tab|Key],["counter"],_)     -> g({bump,  [Tab,chkk(Key),1]});
+x("PUT",   [Tab|Key],["counter",L,H],_) -> g({bump,  [Tab,chkk(Key),i(L),i(H)
+                                                     ]});
+x("PUT",   [Tab|Key],["reset"],_)       -> g({reset, [Tab,chkk(Key),0]});
+x("GET",   []       ,[],_)              -> g({sizes, []});
+x("GET",   [Tab]    ,[],_)              -> g({keys,  [Tab]});
+x("GET",   [Tab|Key],[],_)              -> g({single,[Tab,Key]});
+x("GET",   [Tab|Key],["multi"],_)       -> g({multi, [Tab,Key]});
+x("GET",   [Tab|Key],["next"],_)        -> g({next,  [Tab,Key]});
+x("GET",   [Tab|Key],["prev"],_)        -> g({prev,  [Tab,Key]});
+x("POST",  [Tab]    ,[],R)              -> g({insert,[Tab,chkb(body(R))]});
+x("DELETE",[Tab]    ,[],_)              -> g({delete,[Tab]});
+x("DELETE",[Tab|Key],[],_)              -> g({delete,[Tab,Key]});
+x("TRACE",_,_,_)                        -> throw({405,"method not allowed"});
+x(Meth,URI,Headers,Bdy)                 -> throw({404,{Meth,URI,Headers,Bdy}}).
 
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
@@ -103,6 +105,11 @@ chk_bp({Key,Val}) ->
 chkk(Key) -> lists:map(fun chk_el/1,Key).
 chk_el(".") -> throw({404,key_element_is_period});
 chk_el(El)  -> El.
+
+i(Str) ->
+  try list_to_integer(Str)
+  catch error:badarg -> throw({400,not_an_integer})
+  end.
 
 body(Req) ->
   case cowboy_req:has_body(Req) of
