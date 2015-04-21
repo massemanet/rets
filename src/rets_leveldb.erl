@@ -55,7 +55,7 @@ delete_file(Op,File) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])       -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])       -> {delete(tab_name(Tab)),S};
+delete(S ,[Tab])       -> {delete_tab(S,tab_name(Tab)),S};
 delete(S ,[Tab,Key])   -> {deleter(S,tab(Tab),Key),S}.
 sizes(S  ,[])          -> {siz(),S}.
 keys(S   ,[Tab])       -> {key_getter(S,tab(Tab)),S}.
@@ -74,10 +74,14 @@ create(Tab) ->
     []            -> ets:insert(leveldb_tabs,{Tab,0}),true
   end.
 
-delete(Tab) ->
+delete_tab(S,Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of
-    [{Tab,_Size}] -> ets:delete(leveldb_tabs,Tab),true;
-    []            -> false
+    [{Tab,_Size}] ->
+      [deleter(S,Tab,mk_ekey(Key)) || Key <- key_getter(S,Tab)],
+      ets:delete(leveldb_tabs,Tab),
+      true;
+    [] ->
+      false
   end.
 
 siz() ->
@@ -154,7 +158,7 @@ getter(S,multi,Tab,Ekey) ->
         As -> {As}
       end;
     Val ->
-      {[{list_to_binary(string:join(Ekey,"/")),Val}]}
+      {[{unmk_ekey(Ekey),Val}]}
   end.
 
 next(S,TK,WKey,Acc) ->
@@ -184,20 +188,32 @@ nextprev(S,OP,TK) ->
   check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK).
 
 check_np(prev,invalid_iterator,Iter,TK) ->
-  case lvl_mv_iter(Iter,last) of
-    invalid_iterator -> throw({409,end_of_table});
-    {LastTK,Val} ->
-      case LastTK < TK of
-        true -> check_np(prev,{LastTK,Val},Iter,TK);
-        false-> check_np(next,invalid_iterator,Iter,TK)
-      end
-  end;
-check_np(_,invalid_iterator,_,_) ->
+  %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
+  %% case of TK being the last record, it will return an
+  %% invalid_iterator and we have to fix the situation here
+  check_np(prev,lvl_mv_iter(Iter,last),TK);
+check_np(prev,{TKNext,_},Iter,TK) when TKNext >= TK ->
+  %% lvl_mv_iter/2 moved the iterator to the first record not before
+  %% TK: we are interested in the previous record, so an additional
+  %% iterator step is necessary
+  check_np(prev,lvl_mv_iter(Iter,prev),TK);
+check_np(next,{TK,_},Iter,TK) ->
+  %% the requested key was in the table: an additional iterator step
+  %% is necessary
+  check_np(next,lvl_mv_iter(Iter,next),TK);
+check_np(next,TKV,_Iter,TK) ->
+  check_np(next,TKV,TK).
+
+check_np(_,invalid_iterator,_) ->
   end_of_table;
-check_np(OP,{TK,_},Iter,TK) ->
-  check_np(OP,lvl_mv_iter(Iter,OP),Iter,TK);
-check_np(_,{TK,V},_,_) ->
-  {TK,V}.
+check_np(OP,{TK2,V},TK1) when OP =:= next andalso TK2 > TK1;
+                              OP =:= prev andalso TK2 < TK1 ->
+  %% The tab of the two TK:s must match, otherwise we've reached the
+  %% end of this particular table
+  case tk_tab(TK1) =:= tk_tab(TK2) of
+    true  -> {TK2,V};
+    false -> end_of_table
+  end.
 
 deleter(S,Tab,Key) ->
   TK = tk(Tab,Key),
@@ -233,8 +249,11 @@ tab_unname(Tab) ->
 mk_ekey(Bin) ->
   string:tokens(binary_to_list(Bin),"/").
 
+unmk_ekey(EList) ->
+  list_to_binary(string:join(EList,"/")).
+
 tk(Tab,ElList) ->
-  Key = list_to_binary(string:join(ElList,"/")),
+  Key = unmk_ekey(ElList),
   <<Tab/binary,$/,Key/binary>>.
 
 tk_key(TK) ->
