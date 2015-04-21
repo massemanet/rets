@@ -1,3 +1,4 @@
+%% -*- mode: erlang; erlang-indent-level: 2 -*-
 -module(rets_app).
 
 -behaviour(application).
@@ -11,13 +12,24 @@
 
 start(_StartType, _StartArgs) ->
   start_cowboy_instance(),
-  rets_sup:start_link([application:get_all_env(rets)]).
+  case rets_sup:start_link([application:get_all_env(rets)]) of
+    {ok, _Pid} = OK ->
+      OK;
+    Error ->
+      stop_cowboy_instance(),
+      Error
+  end.
 
 stop(_State) ->
+  stop_cowboy_instance(),
   ok.
 
 start_cowboy_instance() ->
-  start_cowboy().
+  {ok, _} = start_cowboy().
+
+stop_cowboy_instance() ->
+  Opts = rets:cowboy_opts(),
+  cowboy:stop_listener(proplists:get_value(name,Opts)).
 
 start_cowboy() ->
   Opts = rets:cowboy_opts(),
