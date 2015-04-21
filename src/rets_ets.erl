@@ -18,7 +18,9 @@
          next/2,
          prev/2,
          multi/2,
-         single/2]).
+         single/2,
+         via/2
+        ]).
 
 -record(state, {tables=[],
                 props=[named_table,ordered_set,public]}).
@@ -27,21 +29,22 @@ init(_Env)        -> #state{}.
 terminate(_State) -> ok.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])         -> creat(S,Tab).
-delete(S ,[Tab])         -> delet(S,Tab);
-delete(S ,[Tab,Key])     -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
-sizes(S  ,[])            -> {siz(S),S}.
-keys(S   ,[Tab])         -> {key_getter(tab(Tab)),S}.
-insert(S ,[Tab,KVs])     -> {ins(tab(Tab),[{key_e2i(i,K),V}
-                                           || {K,V} <- KVs]),S};
-insert(S ,[Tab,K,V])     -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
-bump(S   ,[Tab,Key,I])   -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
-bump(S   ,[Tab,Key,L,H]) -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
-reset(S  ,[Tab,Key,I])   -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
-next(S   ,[Tab,Key])     -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
-prev(S   ,[Tab,Key])     -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
-multi(S  ,[Tab,Key])     -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
-single(S ,[Tab,Key])     -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+create(S ,[Tab])            -> creat(S,Tab).
+delete(S ,[Tab])            -> delet(S,Tab);
+delete(S ,[Tab,Key])        -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
+sizes(S  ,[])               -> {siz(S),S}.
+keys(S   ,[Tab])            -> {key_getter(tab(Tab)),S}.
+insert(S ,[Tab,KVs])        -> {ins(tab(Tab),[{key_e2i(i,K),V}
+                                              || {K,V} <- KVs]),S};
+insert(S ,[Tab,K,V])        -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
+bump(S   ,[Tab,Key,I])      -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
+bump(S   ,[Tab,Key,L,H])    -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
+reset(S  ,[Tab,Key,I])      -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
+next(S   ,[Tab,Key])        -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
+prev(S   ,[Tab,Key])        -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
+multi(S  ,[Tab,Key])        -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
+single(S ,[Tab,Key])        -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+via(S    ,[Tab1,Tab2,Key2]) -> {via(tab(Tab1),tab(Tab2),key_e2i(i,Key2)),S}.
 
 creat(S,Tab) ->
   case lists:member(Tab,S#state.tables) of
@@ -113,6 +116,41 @@ reset_counter(Tab,Key,Begin) ->
   ets:insert(Tab,{Key,Begin}),
   Begin.
 
+via(Tab1,Tab2,Key2) ->
+  %% Key2 in Tab2 holds the last visited key of Tab1. This operation
+  %% gets the next key and value from Tab1, updating the pointer under
+  %% Key2.
+  %%
+  %% It is important to pay attention to internal and external
+  %% representation of keys:
+  %% - Key2 is already in internal format
+  %% - Tab2 holds Key1 in external format (otherwise a simple get from
+  %%   Tab2 @ Key2 would crash)
+  %% - Key1 therefore needs to be converted to internal format before
+  %%   using it for a lookup in Tab1
+  %% - Once the next Key1 is found, it needs to be converted to
+  %%   external format before saving in Tab2
+  case ets:lookup(Tab2,Key2) of
+    [{Key2,EKey}] -> next_via(Tab1,key_e2i(EKey),Tab2,Key2);
+    []            -> first_via(Tab1,Tab2,Key2)
+  end.
+
+next_via(Tab1,Key1,Tab2,Key2) ->
+  case ets:lookup(Tab1,ets:next(Tab1,Key1)) of
+    [Rec] -> found_via(Tab2,Key2,Rec);
+    []    -> first_via(Tab1,Tab2,Key2)
+  end.
+
+first_via(Tab1,Tab2,Key2) ->
+  case ets:lookup(Tab1,ets:first(Tab1)) of
+    [Rec] -> found_via(Tab2,Key2,Rec);
+    []    -> throw({409,end_of_table})
+  end.
+
+found_via(Tab2,Key2,{Key1,V}) ->
+  ets:insert(Tab2,{Key2,key_i2e(Key1)}),
+  {[{key_i2e(Key1),V}]}.
+
 %% key handling
 %% the external form of a key is the path part of an url, basically
 %% any number of slash-separated elements, each of which is
@@ -135,6 +173,10 @@ elem(_,E)   -> list_to_binary(E).
 %% transform key, internal to external.
 key_i2e(T) ->
   list_to_binary(join(tuple_to_list(T),<<"/">>)).
+
+%% the reverse of key_i2e/1
+key_e2i(T) ->
+  list_to_tuple(binary:split(T,<<"/">>,[global])).
 
 join([E],_) -> [E];
 join([E|R],D) -> [E,D|join(R,D)].

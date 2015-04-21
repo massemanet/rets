@@ -75,6 +75,7 @@ reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
 x("PUT",   [Tab]    ,[],_)              -> g({create,[Tab]});
+x("PUT",   [Tab|Key],["indirect",T],_)  -> g({via,   [T,Tab,chkk(Key)]});
 x("PUT",   [Tab|Key],[],R)              -> g({insert,[Tab,chkk(Key),body(R)]});
 x("PUT",   [Tab|Key],["counter"],_)     -> g({bump,  [Tab,chkk(Key),1]});
 x("PUT",   [Tab|Key],["counter",L,H],_) -> g({bump,  [Tab,chkk(Key),i(L),i(H)
@@ -468,6 +469,33 @@ t10(Backend) ->
                rets_client:get(localhost,tibbe,"z",prev)),
   ?assertEqual({409,"end_of_table"},
                rets_client:get(localhost,tibbe,"c",prev)).
+
+t11_ets_test()     -> t11(ets).
+t11_leveldb_test() -> t11(leveldb).
+t11(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,'a/b/c',foo)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,'x/y/z',bar)),
+  ?assertEqual({200,[{"a/b/c","foo"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"a/b/c"},
+               rets_client:get(localhost,tibbe,a)),
+  ?assertEqual({200,[{"x/y/z","bar"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"x/y/z"},
+               rets_client:get(localhost,tibbe,a)),
+  ?assertEqual({200,[{"a/b/c","foo"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"a/b/c"},
+               rets_client:get(localhost,tibbe,a)).
 
 restart_rets(Backend) ->
   application:stop(rets),

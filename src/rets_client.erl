@@ -40,6 +40,8 @@ delete(Host,Tab,Key) ->
 
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
+put(Host,Tab,Key,{indirect,T}) ->
+  put(Host,Tab,Key,[{"rets","indirect," ++ to_list(T)}],[],[]);
 put(Host,Tab,Key,{counter,L,H}) ->
   put(Host,Tab,Key,[{"rets",string:join(["counter",s(L),s(H)],",")}],[],[]);
 put(Host,Tab,Key,counter) ->

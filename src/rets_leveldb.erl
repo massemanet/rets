@@ -18,7 +18,9 @@
          next/2,
          prev/2,
          multi/2,
-         single/2]).
+         single/2,
+         via/2
+        ]).
 
 -record(state,
         {tables=[],
@@ -54,20 +56,21 @@ delete_file(Op,File) ->
   end.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])         -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])         -> {delete_tab(S,tab_name(Tab)),S};
-delete(S ,[Tab,Key])     -> {deleter(S,tab(Tab),Key),S}.
-sizes(S  ,[])            -> {siz(),S}.
-keys(S   ,[Tab])         -> {key_getter(S,tab(Tab)),S}.
-insert(S ,[Tab,KVs])     -> {ins(S,tab(Tab),KVs),S};
-insert(S ,[Tab,K,V])     -> {ins(S,tab(Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I])   -> {update_counter(S,tab(Tab),Key,I),S};
-bump(S   ,[Tab,Key,L,H]) -> {update_counter(S,tab(Tab),Key,L,H),S}.
-reset(S  ,[Tab,Key,I])   -> {reset_counter(S,tab(Tab),Key,I),S}.
-next(S   ,[Tab,Key])     -> {nextprev(S,next,tab(Tab),Key),S}.
-prev(S   ,[Tab,Key])     -> {nextprev(S,prev,tab(Tab),Key),S}.
-multi(S  ,[Tab,Key])     -> {getter(S,multi,tab(Tab),Key),S}.
-single(S ,[Tab,Key])     -> {getter(S,single,tab(Tab),Key),S}.
+create(S ,[Tab])            -> {create(tab_name(Tab)),S}.
+delete(S ,[Tab])            -> {delete_tab(S,tab_name(Tab)),S};
+delete(S ,[Tab,Key])        -> {deleter(S,tab(Tab),Key),S}.
+sizes(S  ,[])               -> {siz(),S}.
+keys(S   ,[Tab])            -> {key_getter(S,tab(Tab)),S}.
+insert(S ,[Tab,KVs])        -> {ins(S,tab(Tab),KVs),S};
+insert(S ,[Tab,K,V])        -> {ins(S,tab(Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])      -> {update_counter(S,tab(Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H])    -> {update_counter(S,tab(Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])      -> {reset_counter(S,tab(Tab),Key,I),S}.
+next(S   ,[Tab,Key])        -> {nextprev(S,next,tab(Tab),Key),S}.
+prev(S   ,[Tab,Key])        -> {nextprev(S,prev,tab(Tab),Key),S}.
+multi(S  ,[Tab,Key])        -> {getter(S,multi,tab(Tab),Key),S}.
+single(S ,[Tab,Key])        -> {getter(S,single,tab(Tab),Key),S}.
+via(S    ,[Tab1,Tab2,Key2]) -> {via(S,tab(Tab1),tab(Tab2),Key2),S}.
 
 create(Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of
@@ -232,6 +235,39 @@ deleter(S,Tab,Key) ->
       lvl_delete(S,tk(Tab,Key)),
       ets:update_counter(leveldb_tabs,Tab,-1),
       Val
+  end.
+
+via(S,Tab1,Tab2,Key2) ->
+  %% Key2 in Tab2 holds the last visited key of Tab1. This operation
+  %% gets the next key and value from Tab1, updating the pointer under
+  %% Key2.
+  %%
+  %% It is important to pay attention to internal and external
+  %% representation of keys:
+  %% - Key2 does not need any transformation; it is already in the
+  %%   format gettert and setter functions expect it to be.
+  %% - Tab2 holds Key1 in external format (otherwise a simple get from
+  %%   Tab2 @ Key2 would crash)
+  %% - Key1 therefore needs to be converted to internal format before
+  %%   using it for a lookup in Tab1
+  %% - Once the next Key1 is found, it needs to be converted to
+  %%   external format before saving in Tab2
+  case lvl_get(S,tk(Tab2,Key2)) of
+    not_found -> via(S,Tab1,[],Tab2,Key2,false);
+    Key1      -> via(S,Tab1,mk_ekey(Key1),Tab2,Key2,true)
+  end.
+
+via(S,Tab1,Key1,Tab2,Key2,Retry) ->
+  case nextprev(S,next,tk(Tab1,Key1)) of
+    end_of_table when Retry ->
+      via(S,Tab1,[],Tab2,Key2,false);
+    end_of_table ->
+      throw({409,end_of_table});
+    {TK,V} ->
+      NextKey = tk_key(TK),
+      NextVal = unpack_val(V),
+      ins_overwrite(S,Tab2,Key2,NextKey),
+      {[{NextKey,NextVal}]}
   end.
 
 %% data packing
