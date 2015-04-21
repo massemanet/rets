@@ -9,8 +9,8 @@
 -author('mats cronqvist').
 
 -export([start/0]).       % start the application
-
 -export([start/1]).       % interactive start, with backend choice
+-export([state/0]).
 
 %% should say "-behavior(cowboy_http_handler)." here, but rebar freaks out
 
@@ -30,6 +30,9 @@ start(Backend) ->
     ets     -> application:unset_env(rets,backend)
   end,
   start().
+
+state() ->
+  rets_handler:state().
 
 %% called from rets_app
 cowboy_opts() ->

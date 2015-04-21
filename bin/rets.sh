@@ -36,6 +36,7 @@ tryt() {
 # (hopefully) self-explanatory config parameters
 # it should not be necessary to change anything outside of this block
 export ITEM=rets
+export ITEM_BACKEND=leveldb
 export ITEM_STARTMOD=$ITEM
 export ITEM_USER=$USER
 export ITEM_LOGDIR=`tryt /var/log /tmp`/$ITEM
@@ -69,7 +70,7 @@ item_start() {
         -setcookie $ITEM \
         -boot start_sasl \
         -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
-        -rets backend ets \
+        -rets backend $ITEM_BACKEND \
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \
