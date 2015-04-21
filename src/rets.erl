@@ -25,9 +25,9 @@ start() ->
   application:ensure_all_started(rets).
 
 start(Backend) ->
-  case Backend of
-    leveldb -> application:set_env(rets,backend,leveldb);
-    ets     -> application:unset_env(rets,backend)
+  case lists:member(Backend,[leveldb,ets]) of
+    true -> application:set_env(rets,backend,Backend);
+    false-> exit({bad_backend,Backend})
   end,
   start().
 
