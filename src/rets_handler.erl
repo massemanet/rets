@@ -85,7 +85,7 @@ expand_recs(Term) ->
 rec_info(state) -> record_info(fields,state).
 
 do_init(Args) ->
-  BE = proplists:get_value(backend,Args,ets),
+  BE = proplists:get_value(backend,Args,leveldb),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
   {ok,#state{backend  = BE,
              env      = Args,

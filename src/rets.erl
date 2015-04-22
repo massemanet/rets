@@ -9,8 +9,8 @@
 -author('mats cronqvist').
 
 -export([start/0]).       % start the application
-
 -export([start/1]).       % interactive start, with backend choice
+-export([state/0]).
 
 %% should say "-behavior(cowboy_http_handler)." here, but rebar freaks out
 
@@ -25,11 +25,14 @@ start() ->
   application:ensure_all_started(rets).
 
 start(Backend) ->
-  case Backend of
-    leveldb -> application:set_env(rets,backend,leveldb);
-    ets     -> application:unset_env(rets,backend)
+  case lists:member(Backend,[leveldb,ets]) of
+    true -> application:set_env(rets,backend,Backend);
+    false-> exit({bad_backend,Backend})
   end,
   start().
+
+state() ->
+  rets_handler:state().
 
 %% called from rets_app
 cowboy_opts() ->
