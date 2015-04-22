@@ -40,15 +40,24 @@ DELETE  Key   force              delete Key              null|Value
 DELETE  Key            Val       delete Key iff Key/Val  null
 ```
 
-  Key is a string, consisting of "/"-separated Elements
-  Element is a non-empty string with characters from the set "a-zA-Z0-9-_.~"
-  Element can not be "."
-  KeyW is a string, consisting of "/"-separated Element | ".". The single
-  period is a wildcard, and matches any Element
-  Val is a JSON object
-  WriteOp is; ["delete",Key] | ["delete",Key,OldVal] |
-              ["insert",Key,Val] | ["insert",Key,Val,OldVal] |
-              ["bump",Key] | ["reset",Key]
-  ReadOp is; ["single",KeyW] | ["multi",KeyW] |
-             ["next",KeyW] | ["prev",KeyW] |
-             ["keys",KeyW]
+Key is a string, consisting of "/"-separated Elements.
+
+Element is a non-empty string with characters from the set "a-zA-Z0-9-_.~"
+Element can not be ".".
+
+KeyW is a string, consisting of "/"-separated Fields. A Field is an Element or
+".". The single period is a wildcard, and matches any Element.
+
+Val is a JSON object.
+
+WriteOp is; ["delete",Key] |
+            ["delete",Key,OldVal] |
+            ["insert",Key,Val] |
+            ["insert",Key,Val,OldVal] |
+            ["bump",Key] | ["reset",Key]
+
+ReadOp is; ["single",KeyW] |
+           ["multi",KeyW] |
+           ["next",KeyW] |
+           ["prev",KeyW] |
+           ["keys",KeyW]
