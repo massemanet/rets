@@ -6,7 +6,7 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/1,get/2,get/3,
+-export([get/2,get/3,
          delete/2,
          put/3,
          post/2,
@@ -14,20 +14,13 @@
 
 -define(is_string(S), S=="";is_integer(hd(S))).
 
-get(Host) ->
-  atomize(get(Host,"")).
 get(Host,Key) ->
-  get(Host,Key,[],[]).
-get(Host,Key,next) ->
-  get(Host,Key,[{"rets","next"}],[]);
-get(Host,Key,prev) ->
-  get(Host,Key,[{"rets","prev"}],[]);
-get(Host,Key,multi) ->
-  get(Host,Key,[{"rets","multi"}],[]).
-
-%% internal
-get(Host,Key,Headers,[]) ->
-  httpc_request(get,Host,Key,Headers).
+  get(Host,Key,single).
+get(Host,Key,Header) ->
+  case lists:member(Header,[single,multi,next,prev,keys]) of
+    true -> httpc_request(get,Host,Key,[{"rets",atom_to_list(Header)}],[]);
+    false-> exit({unrecognized_header,Header})
+  end.
 
 delete(Host,Key) ->
   httpc_request(delete,Host,Key,[]).
