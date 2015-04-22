@@ -1,9 +1,36 @@
-commit 67e1db11fe0deb2966cbefe7936893d25aaed71a
+commit b02b66698baa11baf80a6932223cba58b982ada4
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Apr 22 12:02:28 2015 +0200
+
+    v0.8.5
+
+src/rets.app.src
+
+commit c60d36641418f69125fb770117d63a81fe5c8505
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Tue Apr 21 14:24:37 2015 +0200
+
+    make application:start(rets) use leveldb backend
+
+src/rets.erl
+src/rets_handler.erl
+
+commit 764ee67a913d64d80ac3c746b84fb89caff69317
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Tue Apr 21 14:14:32 2015 +0200
+
+    make rets.sh use leveldb backend
+
+bin/rets.sh
+src/rets.erl
+
+commit 8b629ab7197be7e5e8760a048a560b056a5d98f8
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Nov 27 15:13:30 2014 +0100
 
     v0.8.4
 
+ChangeLog
 src/rets.app.src
 
 commit 4ded98d22a651cea14c82eab96d09974ff47ff94
