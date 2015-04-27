@@ -11,5 +11,8 @@
                   lhttpc
                  ]},
   {mod, { rets_app, []}},
-  {env, []}
+  {env, [ {backend,   ets}
+        , {table_dir, "/tmp/rets/leveldb"}
+        , {keep_db,   false}
+        ]}
  ]}.

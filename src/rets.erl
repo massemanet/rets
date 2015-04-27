@@ -497,6 +497,52 @@ t11(Backend) ->
   ?assertEqual({200,"a/b/c"},
                rets_client:get(localhost,tibbe,a)).
 
+t12_leveldb_test_() ->
+  {setup,
+   %% SETUP
+   fun () ->
+       restart_rets(leveldb),
+       application:set_env(rets, keep_db, true)
+   end,
+   %% CLEANUP
+   fun (_) ->
+       application:set_env(rets, keep_db, false),
+       application:stop(rets)
+   end,
+   [fun t12/0
+   ]}.
+t12() ->
+  %% Initially the DB is empty
+  ?assertEqual({200,[]},
+               rets_client:get(localhost)),
+
+  %% Add some data
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,a,1)),
+  ?assertEqual({200,[{tebbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+
+  %% Restart rets when keep_db is set
+  restart_rets(leveldb),
+  
+  %% Verify the data stayed
+  ?assertEqual({200,[{tebbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+  
+  %% Restart rets when keep_db is not set
+  application:set_env(rets, keep_db, false),
+  restart_rets(leveldb),
+  
+  %% Verify the data vanished
+  ?assertEqual({200,[]},
+               rets_client:get(localhost)).
+
 restart_rets(Backend) ->
   application:stop(rets),
   {ok,_} = start(Backend).

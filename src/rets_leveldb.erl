@@ -27,16 +27,26 @@
          handle,
          dir}).
 
+-define(tabs_key, <<"$leveldb_tabs$">>).
+
 init(Env) ->
   ets:new(leveldb_tabs,[ordered_set,named_table,public]),
   Dir = proplists:get_value(table_dir,Env,"/tmp/rets/leveldb"),
   filelib:ensure_dir(Dir),
-  #state{handle = lvl_open(Dir),
-         dir = Dir}.
+  State = #state{handle = lvl_open(Dir),
+                 dir = Dir},
+  restore_meta_data(State),
+  State.
 
 terminate(S) ->
-  lvl_close(S),
-  delete_recursively(S#state.dir).
+  case application:get_env(rets, keep_db, false) of
+    true ->
+      persist_db(S),
+      lvl_close(S);
+    false ->
+      lvl_close(S),
+      delete_recursively(S#state.dir)
+  end.
 
 delete_recursively(File) ->
   case filelib:is_dir(File) of
@@ -54,6 +64,43 @@ delete_file(Op,File) ->
     ok -> ok;
     {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
   end.
+
+persist_db(S) ->
+  %% Some meta-data about the tables is stored in ETS. It is possible
+  %% to reconstruct this information from the raw data in LevelDB, but
+  %% it is expensive. It makes more sense to save the meta-data with
+  %% the regular data (under a special key that otherwise cannot be
+  %% used in rets).
+  do_ins(S, ?tabs_key, ets:tab2list(leveldb_tabs)).
+
+restore_meta_data(S) ->
+  %% Try to restore the meta-data saved by `persist_db' into the ETS
+  %% table.
+  case lvl_get(S, ?tabs_key) of
+    not_found ->
+      %% Recreate the meta-data by traversing the table
+      recreate_meta_data(S);
+    Meta when is_list(Meta) ->
+      ets:insert(leveldb_tabs, Meta),
+      %% Delete the special key, so if we crash the next restart would
+      %% rather recreate the meta-data from scratch than use this
+      %% outdated information
+      lvl_delete(S, ?tabs_key)
+  end.
+
+recreate_meta_data(S) ->
+  I = lvl_iter(S, keys_only),
+  recreate_meta_data(lvl_mv_iter(I, first), I, <<>>).
+
+recreate_meta_data(invalid_iterator, _I, _LastTab) ->
+  ok;
+recreate_meta_data(TK, I, LastTab) ->
+  ThisTab = tk_tab(TK),
+  case ThisTab of
+    LastTab -> ets:update_counter(leveldb_tabs, ThisTab, 1);
+    _       -> ets:insert(leveldb_tabs, {ThisTab, 1})
+  end,
+  recreate_meta_data(lvl_mv_iter(I, next), I, ThisTab).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])            -> {create(tab_name(Tab)),S}.

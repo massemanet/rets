@@ -43,6 +43,7 @@ export ITEM_LOGDIR=`tryt /var/log /tmp`/$ITEM
 export ITEM_LIBDIR=`eval echo ~$ITEM_USER`/git/$ITEM
 export ITEM_DEPS="$ITEM_LIBDIR/deps/*"
 export ITEM_ERL=`which erl`
+export ITEM_TABDIR=$ITEM_LIBDIR/db
 export ITEM_GROUP=`id -g $ITEM_USER`
 export ITEM_BOOTLOG=$ITEM_LOGDIR/boot.log
 export ITEM_ERLLOG=$ITEM_LOGDIR/erlang.log
@@ -69,8 +70,15 @@ item_start() {
         -sname $ITEM_SNAME \
         -setcookie $ITEM \
         -boot start_sasl \
+<<<<<<< HEAD
         -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
         -rets backend $ITEM_BACKEND \
+=======
+        -kernel error_logger \"{file,\\\"$ITEM_ERLLOG\\\"}\" \
+        -rets backend leveld \
+        -rets table_dir \"$ITEM_TABDIR\" \
+        -rets keep_db false \
+>>>>>>> 96e15cd... [GBL-19940] Allow keeping the LevelDB data on restart
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \
