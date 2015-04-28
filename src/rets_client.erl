@@ -68,7 +68,7 @@ trace(Host,Headers) ->
 httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
 httpc_request(M,Host,Tab,Key,Headers,PL) ->
-  start_app(lhttpc),
+  application:ensure_all_started(lhttpc),
   case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
     {ok,{{Status,_StatusText},_Headers,Reply}} ->
       case Status of
@@ -83,9 +83,6 @@ httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
   lhttpc:request(URL, M, Headers, [], ?http_timeout, ?http_opts);
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
   lhttpc:request(URL, M, Headers, PL, ?http_timeout, ?http_opts).
-
-start_app(M) ->
-  [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
 
 url(Host,Tab,Key) ->
   Prot = "http",
