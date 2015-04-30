@@ -6,7 +6,7 @@
 
 -module('rets_client').
 -author('mats cronqvist').
--export([get/2,get/3,
+-export([get/1,get/2,get/3,
          delete/2,
          put/3,
          post/2,
@@ -14,6 +14,8 @@
 
 -define(is_string(S), S=="";is_integer(hd(S))).
 
+get(Host) ->
+  get(Host,"").
 get(Host,Key) ->
   get(Host,Key,single).
 get(Host,Key,Header) ->
@@ -103,19 +105,6 @@ prep(X) when ?is_string(X) -> unicode:characters_to_binary(X,unicode,utf8);
 prep(PL = [{_,_}|_])       -> {[{prep(K),prep(V)}||{K,V}<-PL]};
 prep(L) when is_list(L)    -> [prep(E)||E<-L];
 prep(T) when is_tuple(T)   -> list_to_tuple([prep(E)||E<-tuple_to_list(T)]).
-
-atomize(X) ->
-  ize(X,fun(Y) -> list_to_existing_atom(Y) end).
-
-ize([],_) -> [];
-ize(S,IZE) when ?is_string(S) ->
-  try IZE(S)
-  catch _:_ -> S
-  end;
-ize(L,IZE) when is_list(L)        -> [ize(E,IZE) || E <- L];
-ize({I,R},IZE) when is_integer(I) -> {I,ize(R,IZE)};
-ize(T,IZE) when is_tuple(T)       -> list_to_tuple(ize(tuple_to_list(T),IZE));
-ize(X,_) -> X.
 
 enc(Term) ->
   jiffy:encode(Term).

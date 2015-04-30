@@ -76,25 +76,31 @@ reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
 %% map http -> operations
-x("GET"   ,Key,["keys"] ,_)  -> g([{<<"keys">>,Key}]);
-x("GET"   ,Key,["next"] ,_)  -> g([{<<"next">>,Key}]);
-x("GET"   ,Key,["prev"] ,_)  -> g([{<<"prev">>,Key}]);
-x("GET"   ,Key,["multi"],_)  -> g([{<<"multi">>,Key}]);
-x("GET"   ,Key,["single"],_) -> g([{<<"single">>,Key}]);
-x("GET"   ,Key,[]        ,_) -> g([{<<"single">>,Key}]);
+x("GET",[]    ,[]        ,_)   -> g([{<<"info">>}]);
+x("GET",[T]   ,[]        ,_)   -> g([{<<"keys">>  ,T}]);
+x("GET",[T]   ,["info"]  ,_)   -> g([{<<"info">>  ,T}]);
+x("GET",[T|Es],[]        ,_)   -> g([{<<"single">>,T,Es}]);
+x("GET",[T|Es],["single"],_)   -> g([{<<"single">>,T,Es}]);
+x("GET",[T|Es],["multi"] ,_)   -> g([{<<"multi">> ,T,Es}]);
+x("GET",[T|Es],["keys"]  ,_)   -> g([{<<"keys">>  ,T,Es}]);
+x("GET",[T|Es],["next"]  ,_)   -> g([{<<"next">>  ,T,Es}]);
+x("GET",[T|Es],["prev"]  ,_)   -> g([{<<"prev">>  ,T,Es}]);
 
-x("PUT"   ,Key,[]       ,R)  -> g([{<<"insert">>,Key,body(R)}]);
-x("PUT"   ,Key,["force"],R)  -> g([{<<"insert">>,Key,{body(R),force}}]);
-x("PUT"   ,Key,["bump"] ,_)  -> g([{<<"bump">>,Key}]);
-x("PUT"   ,Key,["reset"],_)  -> g([{<<"reset">>,Key}]);
+x("PUT",[T]   ,[]       ,_)    -> g([{<<"create">>,T}]);
+x("PUT",[T|Es],[]       ,R)    -> g([{<<"insert">>,T,Es,body(R)}]);
+x("PUT",[T|Es],["force"],R)    -> g([{<<"insert">>,T,Es,body(R),force}]);
+x("PUT",[T|Es],["bump"] ,_)    -> g([{<<"bump">>  ,T,Es}]);
+x("PUT",[T|Es],["reset"],_)    -> g([{<<"reset">> ,T,Es}]);
 
-x("DELETE",Key,[]       ,R)  -> g([{<<"delete">>,Key,body(R)}]);
-x("DELETE",Key,["force"],_)  -> g([{<<"delete">>,Key,force}]);
+x("DELETE",[T]   ,[]       ,_) -> g([{<<"destroy">>,T}]);
+x("DELETE",[T]   ,["force"],_) -> g([{<<"destroy">>,T,force}]);
+x("DELETE",[T|Es],[]       ,R) -> g([{<<"delete">> ,T,Es,body(R)}]);
+x("DELETE",[T|Es],["force"],_) -> g([{<<"delete">> ,T,Es,force}]);
 
-x("POST"  ,_  ,[] ,R)        -> g(chk_body(body(R)));
+x("POST",_,[],R)               -> g(chk_body(body(R)));
 
-x("TRACE" ,_  ,_        ,_)  -> throw({405,"method not allowed"});
-x(Meth    ,URI,Headers  ,_)  -> throw({404,{Meth,URI,Headers}}).
+x("TRACE",_,_,_)               -> throw({405,"method not allowed"});
+x(Method,URI,Headers,_)        -> throw({404,{Method,URI,Headers}}).
 
 chk_body(Body) ->
   try [list_to_tuple(E) || E <- Body]
@@ -117,8 +123,8 @@ method(Req) ->
   string:to_upper(binary_to_list(Method)).
 
 uri(Req) ->
-  {URI,_} = cowboy_req:path(Req),
-  URI.
+  {Elems,_} = cowboy_req:path_info(Req),
+  Elems.
 
 g(Ops) ->
   {F,ValidatedOps} = chk_ops(Ops),
@@ -128,36 +134,42 @@ g(Ops) ->
     {Status,R} -> throw({Status,R})
   end.
 
-%% validat operations
-%% State is {r|w,Key,[ops()]}
+%% validate operations
+%% State is {r|w,[Tab|Elements],[ops()]}
 chk_ops(Ops) ->
-  {F,_,Rops} = lists:foldl(fun chk_op/2,{'',<<>>,[]},lists:keysort(2,Ops)),
+  {F,_,Rops} = lists:foldl(fun chk_op/2,{'',<<>>,[]},Ops),
   {F,lists:reverse(Rops)}.
 
-chk_op({<<"insert">>    ,K,{V,OV}},S) -> chk_op({<<"insert">>,K,V,OV},S);
-chk_op({<<"insert">>    ,K,V},S)      -> chk_op({<<"insert">>,K,V,force},S);
-chk_op({<<"delete">>    ,K},S)        -> chk_op({<<"delete">>,K,force},S);
-chk_op({<<"single">>    ,K},S)        -> emit_r_op(single    ,K,S);
-chk_op({<<"multi">>     ,K},S)        -> emit_r_op(multi     ,K,S);
-chk_op({<<"next">>      ,K},S)        -> emit_r_op(next      ,K,S);
-chk_op({<<"prev">>      ,K},S)        -> emit_r_op(prev      ,K,S);
-chk_op({<<"keys">>      ,K},S)        -> emit_r_op(keys      ,K,S);
-chk_op({<<"insert">>    ,K,V,OV},S)   -> emit_w_op(insert    ,K,{V,OV},S);
-chk_op({<<"bump">>      ,K},S)        -> emit_w_op(bump      ,K,1,S);
-chk_op({<<"reset">>     ,K},S)        -> emit_w_op(reset     ,K,0,S);
-chk_op({<<"delete">>    ,K,V},S)      -> emit_w_op(delete    ,K,V,S);
-chk_op(What,_S)                       -> throw({400,{bad_op,What}}).
+%% these handle both ops from the normal verbs and oplists from POST
+chk_op({<<"bump">>   ,T,K}      ,S) -> emit_op(w,bump    ,{T,K,1},S);
+chk_op({<<"create">> ,T}        ,S) -> emit_op(t,create  ,{T,""},S);
+chk_op({<<"delete">> ,T,K,V}    ,S) -> emit_op(w,delete  ,{T,K,V},S);
+chk_op({<<"destroy">>,T,force}  ,S) -> emit_op(t,destroy ,{T,force},S);
+chk_op({<<"destroy">>,T}        ,S) -> emit_op(t,destroy ,{T,""},S);
+chk_op({<<"info">>}             ,S) -> emit_op(r,info    ,{"",""},S);
+chk_op({<<"info">>   ,T}        ,S) -> emit_op(r,info    ,{T,""},S);
+chk_op({<<"insert">> ,T,K,V,OV} ,S) -> emit_op(w,insert  ,{T,K,{V,OV}},S);
+chk_op({<<"insert">> ,T,K,V}    ,S) -> emit_op(w,insert  ,{T,K,V},S);
+chk_op({<<"keys">>   ,T,K}      ,S) -> emit_op(r,keys    ,{T,K},S);
+chk_op({<<"keys">>   ,T}        ,S) -> emit_op(r,keys    ,{T,""},S);
+chk_op({<<"multi">>  ,T,K}      ,S) -> emit_op(r,multi   ,{T,K},S);
+chk_op({<<"next">>   ,T,K}      ,S) -> emit_op(r,next    ,{T,K},S);
+chk_op({<<"prev">>   ,T,K}      ,S) -> emit_op(r,prev    ,{T,K},S);
+chk_op({<<"reset">>  ,T,K}      ,S) -> emit_op(w,reset   ,{T,K,0},S);
+chk_op({<<"single">> ,T,K}      ,S) -> emit_op(r,single  ,{T,K},S);
+chk_op(What,_S)                     -> throw({400,{bad_op,What}}).
 
-emit_r_op(Op,K,{w,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
-emit_r_op(Op,K,{_,_,A}) ->
-  CK = chk_key(r,K),
-  {r,CK,[{Op,CK}|A]}.
-
-emit_w_op(Op,K,_,{r,_,_}) -> throw({400,{mixed_read_write_ops,Op,K}});
-emit_w_op(Op,K,_,{w,K,_}) -> throw({400,{key_appears_twice,Op,K}});
-emit_w_op(Op,K,V,{_,_,A}) ->
-  CK = chk_key(w,K),
-  {w,CK,[{Op,CK,V}|A]}.
+emit_op(X,Op,TO,{T,_}) when T=/=[] andalso T=/=X ->
+  throw({400,{mixed_op_types,Op,TO}});
+emit_op(t,Op,{T,O},{t,A}) ->
+  chk_key(w,[T]),
+  {t,[{Op,T,O}|A]};
+emit_op(r,Op,{T,K},{_,A}) ->
+  chk_key(r,[T|K]),
+  {r,[{Op,T,K}|A]};
+emit_op(w,Op,{T,K,V},{_,A}) ->
+  chk_key(w,[T|K]),
+  {w,[{Op,T,K,V}|A]}.
 
 chk_key(RorW,Key) ->
   mk_bkey(lists:map(fun(E) -> chkk_el(RorW,E) end,mk_ekey(Key))).

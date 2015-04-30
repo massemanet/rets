@@ -21,23 +21,29 @@ Counters are special integer values, handled through the "bump" and
 "reset" operations.
 
 ```
-Method  URL   Header   Body      Action                  On success, returns
-GET     KeyW  single             succeeds iff 1 Key      Val
-GET     KeyW  multi              multi read Key          [{Key,Val}]
-GET     KeyW  next               next                    {NextKey,NextVal}
-GET     KeyW  prev               prev                    {PrevKey,PrevVal}
-GET     KeyW  keys               get all matching keys   [Key]
+Method  URL     Header   Body      Action                  On success, returns
+GET     ""                         all table_info          [{Table,Info}]
+GET     T                          table_info              [{T,Info}]
+GET     T/KeyW  single             succeeds iff 1 Key      Val
+GET     T/KeyW  multi              multi read Key          [{Key,Val}]
+GET     T/KeyW  next               next                    {NextKey,NextVal}
+GET     T/KeyW  prev               prev                    {PrevKey,PrevVal}
+GET     T/KeyW  keys               get all matching keys   [Key]
 
-PUT     Key   force    Val       insert Key/Val          OldVal
-PUT     Key            [NV,OV]   ins Key/NV iff Key/OV   OldVal
-PUT     Key   bump               bump Val by one         NewInt=OldInt+1
-PUT     Key   reset              reset Val to zero       OldInt
+PUT     T                          create T                null
+PUT     T/Key            Val       ins Key/Val if not Key  null
+PUT     T/Key   force    Val       insert Key/Val          OldVal
+PUT     T/Key            [NV,OV]   ins Key/NV iff Key/OV   OldVal
+PUT     T/Key   bump               bump Val by one         NewInt=OldInt+1
+PUT     T/Key   reset              reset Val to zero       OldInt
 
-POST          write    [WriteOp] mutate Keys             null
-POST          read     [ReadOp]  read many keys          [{Key,Val}|Val]
+POST            write    [WriteOp] do mutating ops         null
+POST            read     [ReadOp]  do read ops             [{Key,Val}|Val]
 
-DELETE  Key   force              delete Key              null|Value
-DELETE  Key            Val       delete Key iff Key/Val  null
+DELETE  T                          delete T iff empty      null
+DELETE  T       force              delete T                null
+DELETE  T/Key   force              delete Key              null|Value
+DELETE  T/Key            Val       delete Key iff Key/Val  null
 ```
 
 Key is a string, consisting of "/"-separated Elements.
