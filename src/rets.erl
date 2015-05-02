@@ -75,6 +75,9 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
+%% the real API is the ops that are sent in though POST. The GET, PUT and
+%% DELETE resources are just sugar. g/1 will validate the syntax of the ops
+%% and serialize through the rets_handler gen_server.
 %% map http -> operations
 x("GET",[]    ,[]        ,_)   -> g([{<<"info">>}]);
 x("GET",[T]   ,[]        ,_)   -> g([{<<"keys">>  ,T}]);
@@ -102,12 +105,19 @@ x("POST",_,[],R)               -> g(chk_body(body(R)));
 x("TRACE",_,_,_)               -> throw({405,"method not allowed"});
 x(Method,URI,Headers,_)        -> throw({404,{Method,URI,Headers}}).
 
+% body is a list of lists, where the second element of the inner list is a path
+% here we split the paths and turn the inner lists into tuples
 chk_body(Body) ->
-  try [list_to_tuple(E) || E <- Body]
+  try [list_to_tuple(split_path(E)) || E <- Body]
   catch _:R -> throw({400,{malformed_body,R,Body}})
   end.
 
-body(Req) ->
+split_path([F,P|R]) ->
+  [F,[E||E<-binary:split(P,<<"/">>,[global]),E =/= <<>>]|R];
+split_path(X) ->
+  X.
+
+ body(Req) ->
   case cowboy_req:has_body(Req) of
     true ->
       {ok,Body,_} = cowboy_req:body(Req),
@@ -137,7 +147,7 @@ g(Ops) ->
 %% validate operations
 %% State is {r|w,[Tab|Elements],[ops()]}
 chk_ops(Ops) ->
-  {F,_,Rops} = lists:foldl(fun chk_op/2,{'',<<>>,[]},Ops),
+  {F,_,Rops} = lists:foldl(fun chk_op/2,[],Ops),
   {F,lists:reverse(Rops)}.
 
 %% these handle both ops from the normal verbs and oplists from POST
@@ -159,28 +169,22 @@ chk_op({<<"reset">>  ,T,K}      ,S) -> emit_op(w,reset   ,{T,K,0},S);
 chk_op({<<"single">> ,T,K}      ,S) -> emit_op(r,single  ,{T,K},S);
 chk_op(What,_S)                     -> throw({400,{bad_op,What}}).
 
-emit_op(X,Op,TO,{T,_}) when T=/=[] andalso T=/=X ->
-  throw({400,{mixed_op_types,Op,TO}});
-emit_op(t,Op,{T,O},{t,A}) ->
+emit_op(t,Op,{T,O},A) ->
   chk_key(w,[T]),
   {t,[{Op,T,O}|A]};
-emit_op(r,Op,{T,K},{_,A}) ->
+emit_op(r,Op,{T,K},A) ->
   chk_key(r,[T|K]),
   {r,[{Op,T,K}|A]};
-emit_op(w,Op,{T,K,V},{_,A}) ->
+emit_op(w,Op,{T,K,V},A) ->
   chk_key(w,[T|K]),
   {w,[{Op,T,K,V}|A]}.
 
 chk_key(RorW,Key) ->
-  mk_bkey(lists:map(fun(E) -> chkk_el(RorW,E) end,mk_ekey(Key))).
-chkk_el(w,".") -> throw({400,key_element_is_period});
-chkk_el(r,".") -> ".";
+  lists:map(fun(E) -> chkk_el(RorW,E) end,Key).
+
+chkk_el(w,<<".">>) -> throw({400,key_element_is_period});
+chkk_el(r,<<".">>) -> <<".">>;
 chkk_el(_,El)  -> lists:map(fun good_char/1,El).
-
-mk_ekey(Key) when is_binary(Key)  -> string:tokens(binary_to_list(Key),"/");
-mk_ekey(Key) -> throw({400,{key_has_bad_type,Key}}).
-
-mk_bkey(EKey) -> list_to_binary(string:join(EKey,"/")).
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
@@ -222,7 +226,7 @@ je(Term) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%t01_ets_test()     -> t01(ets).
+t01_ets_test()     -> t01(ets).
 t01_leveldb_test() -> t01(leveldb).
 t01(Backend) ->
   restart_rets(Backend),
@@ -231,22 +235,24 @@ t01(Backend) ->
                      {"ccc",null},
                      {"ddd",null}]},
                rets_client:post(localhost,
-                                [[insert,'aaa/1/x',"AAA"++[223]],
-                                 [insert,bbb,bBbB],
-                                 [insert,ccc,123.1],
-                                 [insert,ddd,[{a,"A"},{b,b},{c,123.3}]]])),
+                                [[create,foo],
+                                 [insert,"/foo/aaa/1/x","AAA"++[223]],
+                                 [insert,"/foo/bbb",bBbB],
+                                 [insert,"/foo/ccc",123.1],
+                                 [insert,"/foo/ddd",
+                                  [{a,"A"},{b,b},{c,123.3}]]])),
   ?assertEqual({200,[{"aaa/1/x",[$A,$A,$A,223]},
                      {"aaa/1/x",[$A,$A,$A,223]},
                      {"bbb","bBbB"},
                      {"ccc",123.1}]},
                rets_client:post(localhost,
-                               [[multi,'aaa/./x'],
-                                [single,'aaa/1/x'],
-                                [single,bbb],
-                                [multi,ccc]])).
+                               [[multi,"/foo/aaa/./x"],
+                                [single,"/foo/aaa/1/x"],
+                                [single,"/foo/bbb"],
+                                [multi,"/foo/ccc"]])).
 
 
-%t02_ets_test()     -> t02(ets).
+t02_ets_test()     -> t02(ets).
 t02_leveldb_test() -> t02(leveldb).
 t02(Backend) ->
   restart_rets(Backend),
@@ -287,7 +293,7 @@ t02(Backend) ->
                rets_client:post(localhost,
                                 [[prev,'aaa/1/x']])).
 
-%t03_ets_test()     -> t03(ets).
+t03_ets_test()     -> t03(ets).
 t03_leveldb_test() -> t03(leveldb).
 t03(Backend) ->
   restart_rets(Backend),
@@ -300,7 +306,7 @@ t03(Backend) ->
   ?assertEqual({200,[{"foo",0}]},
                rets_client:post(localhost,[[bump,"foo"]])).
 
-%t04_ets_test()     -> t04(ets).
+t04_ets_test()     -> t04(ets).
 t04_leveldb_test() -> t04(leveldb).
 t04(Backend) ->
   restart_rets(Backend),
@@ -327,7 +333,7 @@ t04(Backend) ->
   ?assertEqual({200,[{"bla/1",null},{"bla/2",null}]},
                rets_client:post(localhost,[[keys,"bla/."]])).
 
-%t05_ets_test()     -> t05(ets).
+t05_ets_test()     -> t05(ets).
 t05_leveldb_test() -> t05(leveldb).
 t05(Backend) ->
   restart_rets(Backend),
@@ -342,7 +348,7 @@ t05(Backend) ->
   ?assertEqual({200,[]},
                rets_client:post(localhost,[[keys,"bla"]])).
 
-%t06_ets_test()     -> t06(ets).
+t06_ets_test()     -> t06(ets).
 t06_leveldb_test() -> t06(leveldb).
 t06(Backend) ->
   restart_rets(Backend),
@@ -355,7 +361,7 @@ t06(Backend) ->
   ?assertEqual({200,[{"baz",2}]},
                rets_client:get(localhost,"baz")).
 
-%t07_ets_test()     -> t07(ets).
+t07_ets_test()     -> t07(ets).
 t07_leveldb_test() -> t07(leveldb).
 t07(Backend) ->
   restart_rets(Backend),
