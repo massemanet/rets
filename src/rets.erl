@@ -108,16 +108,25 @@ x(Method,URI,Headers,_)        -> throw({404,{Method,URI,Headers}}).
 % body is a list of lists, where the second element of the inner list is a path
 % here we split the paths and turn the inner lists into tuples
 chk_body(Body) ->
-  try [list_to_tuple(split_path(E)) || E <- Body]
+  try [chk_body_part(E) || E <- Body]
   catch _:R -> throw({400,{malformed_body,R,Body}})
   end.
 
-split_path([F,P|R]) ->
-  [F,[E||E<-binary:split(P,<<"/">>,[global]),E =/= <<>>]|R];
-split_path(X) ->
-  X.
+chk_body_part([F]) ->
+  {F};
+chk_body_part([F,P]) ->
+  list_to_tuple([F]++split_path(P));
+chk_body_part([F,P|R]) ->
+  list_to_tuple([F]++split_path(P)++R).
 
- body(Req) ->
+split_path(P) ->
+  case [E || E <- binary:split(P,<<"/">>,[global]), E =/= <<>>] of
+    []     -> [];
+    [T]    -> [T];
+    [T|Es] -> [T,Es]
+  end.
+
+body(Req) ->
   case cowboy_req:has_body(Req) of
     true ->
       {ok,Body,_} = cowboy_req:body(Req),
@@ -137,18 +146,15 @@ uri(Req) ->
   Elems.
 
 g(Ops) ->
-  {F,ValidatedOps} = chk_ops(Ops),
-  case gen_server:call(rets_handler,{F,ValidatedOps}) of
+  case gen_server:call(rets_handler,chk_ops(Ops)) of
     {ok,{[]}}  -> [];
     {ok,Reply} -> Reply;
     {Status,R} -> throw({Status,R})
   end.
 
 %% validate operations
-%% State is {r|w,[Tab|Elements],[ops()]}
 chk_ops(Ops) ->
-  {F,_,Rops} = lists:foldl(fun chk_op/2,[],Ops),
-  {F,lists:reverse(Rops)}.
+  lists:reverse(lists:foldl(fun chk_op/2,[],Ops)).
 
 %% these handle both ops from the normal verbs and oplists from POST
 chk_op({<<"bump">>   ,T,K}      ,S) -> emit_op(w,bump    ,{T,K,1},S);
@@ -171,33 +177,34 @@ chk_op(What,_S)                     -> throw({400,{bad_op,What}}).
 
 emit_op(t,Op,{T,O},A) ->
   chk_key(w,[T]),
-  {t,[{Op,T,O}|A]};
+  [{t,Op,T,O}|A];
 emit_op(r,Op,{T,K},A) ->
   chk_key(r,[T|K]),
-  {r,[{Op,T,K}|A]};
+  [{r,Op,T,K}|A];
 emit_op(w,Op,{T,K,V},A) ->
   chk_key(w,[T|K]),
-  {w,[{Op,T,K,V}|A]}.
+  [{w,Op,T,K,V}|A].
 
 chk_key(RorW,Key) ->
   lists:map(fun(E) -> chkk_el(RorW,E) end,Key).
 
 chkk_el(w,<<".">>) -> throw({400,key_element_is_period});
 chkk_el(r,<<".">>) -> <<".">>;
-chkk_el(_,El)  -> lists:map(fun good_char/1,El).
+chkk_el(_,El)  -> [bad_char(C) || <<C>> <= El, is_bad(C)].
 
 %% rfc 3986
 %% unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
--define(is_good(C),
-        (($A=<C andalso C=<$Z)
-         orelse ($a=<C andalso C=<$z)
-         orelse ($0=<C andalso C=<$9)
-         orelse (C=:=$-)
-         orelse (C=:=$.)
-         orelse (C=:=$_)
-         orelse (C=:=$~))).
-good_char(C) when ?is_good(C) -> C;
-good_char(C) -> throw({400,{invalid_character_in_uri,C}}).
+is_bad(C) ->
+  not
+    (($A=<C andalso C=<$Z)
+     orelse ($a=<C andalso C=<$z)
+     orelse ($0=<C andalso C=<$9)
+     orelse (C=:=$-)
+     orelse (C=:=$.)
+     orelse (C=:=$_)
+     orelse (C=:=$~)).
+
+bad_char(C) -> throw({400,{invalid_character_in_uri,C}}).
 
 rets_headers(Req) ->
   {Headers,_}= cowboy_req:headers(Req),

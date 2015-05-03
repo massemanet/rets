@@ -119,10 +119,15 @@ do_init(Args) ->
 do_terminate(State) ->
   (State#state.cb_mod):terminate(State#state.cb_state).
 
-do_handle_call({F,Ops},State) ->
+do_handle_call(Ops,State) ->
   try
-    {Reply,CBS} = (State#state.cb_mod):F(State#state.cb_state,Ops),
+    CBS0 = {[],State#state.cb_mod,State#state.cb_state},
+    {Reply,CBS} = lists:foldl(fun do_op/2,CBS0,Ops),
     {reply,{ok,Reply},State#state{cb_state=CBS}}
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}
   end.
+
+do_op(Op,{Acc,Mod,CBS0}) ->
+  {Res,CBS} = Mod:(element(2,Op))(CBS0,Op),
+  {[Res|Acc],Mod,CBS}.
