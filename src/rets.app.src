@@ -12,7 +12,7 @@
                  ]},
   {mod, { rets_app, []}},
   {env, [ {backend,   ets}
-        , {table_dir, "/tmp/rets/leveldb"}
+        , {table_dir, "/tmp/rets/db"}
         , {keep_db,   false}
         ]}
  ]}.

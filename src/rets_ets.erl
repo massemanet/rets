@@ -7,7 +7,7 @@
 -module('rets_ets').
 -author('Mats Cronqvist').
 -export([init/1,
-         terminate/1,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -23,10 +23,64 @@
         ]).
 
 -record(state, {tables=[],
-                props=[named_table,ordered_set,public]}).
+                start_tables = [],
+                props=[named_table,ordered_set,public],
+                dir,
+                idx
+               }).
 
-init(_Env)        -> #state{}.
-terminate(_State) -> ok.
+-define(index, "idx.term").
+
+init(Env) ->
+  Dir = rets_handler:get_value(table_dir, Env),
+  Idx = filename:join(Dir, ?index),
+  ok = filelib:ensure_dir(Idx),
+  load_db(#state{dir = Dir, idx = Idx}).
+
+load_db(State = #state{dir = Dir, idx = Idx}) ->
+  case file:consult(Idx) of
+    {ok, Ts} ->
+      Tables = lists:sort([load_table(Dir, T) || T <- Ts, is_atom(T)]),
+      State#state{tables       = Tables,
+                  start_tables = Tables};
+    {error, _} ->
+      State
+  end.
+
+load_table(Dir, T) when is_atom(T) ->
+  Tab  = atom_to_list(T),
+  File = tab_file_name(Dir, Tab),
+  {ok, T} = ets:file2tab(File),
+  Tab.
+
+terminate(State, true) ->
+  save_db(State);
+terminate(_State, false) ->
+  ok.
+
+save_db(#state{tables       = Tabs,
+               start_tables = StartTabs,
+               dir          = Dir,
+               idx          = Idx}) ->
+  %% Save all ETS tables and the index
+  Ts = [save_table(Dir, Tab) || Tab <- Tabs],
+  ok = file:write_file(Idx, [io_lib:format("~p.~n", [T]) || T <- Ts]),
+
+  %% Delete those tabs that were saved the last time the backend was
+  %% stopped but no longer exists
+  [ok = file:delete(tab_file_name(Dir, Tab))
+   || Tab <- ordsets:subtract(StartTabs, Tabs)],
+
+  ok.
+
+save_table(Dir, Tab) when is_list(Tab) ->
+  T = list_to_atom(Tab),
+  File = tab_file_name(Dir, Tab),
+  ok = ets:tab2file(T, File),
+  T.
+
+tab_file_name(Dir, Tab) when is_list(Tab) ->
+  filename:join(Dir, Tab ++ ".tab").
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])            -> creat(S,Tab).

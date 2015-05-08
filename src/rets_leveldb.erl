@@ -7,7 +7,7 @@
 -module('rets_leveldb').
 -author('Mats Cronqvist').
 -export([init/1,
-         terminate/1,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -31,39 +31,18 @@
 
 init(Env) ->
   ets:new(leveldb_tabs,[ordered_set,named_table,public]),
-  Dir = proplists:get_value(table_dir,Env,"/tmp/rets/leveldb"),
+  Dir = rets_handler:get_value(table_dir, Env),
   filelib:ensure_dir(Dir),
   State = #state{handle = lvl_open(Dir),
                  dir = Dir},
   restore_meta_data(State),
   State.
 
-terminate(S) ->
-  case application:get_env(rets, keep_db, false) of
-    true ->
-      persist_db(S),
-      lvl_close(S);
-    false ->
-      lvl_close(S),
-      delete_recursively(S#state.dir)
-  end.
-
-delete_recursively(File) ->
-  case filelib:is_dir(File) of
-    true ->
-      {ok,Fs} = file:list_dir(File),
-      Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
-      lists:foreach(Del,Fs),
-      delete_file(del_dir,File);
-    false->
-      delete_file(delete,File)
-  end.
-
-delete_file(Op,File) ->
-  case file:Op(File) of
-    ok -> ok;
-    {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
-  end.
+terminate(S, KeepDB) ->
+  if KeepDB -> persist_db(S);
+     true   -> ok
+  end,
+  lvl_close(S).
 
 persist_db(S) ->
   %% Some meta-data about the tables is stored in ETS. It is possible

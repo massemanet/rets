@@ -497,21 +497,23 @@ t11(Backend) ->
   ?assertEqual({200,"a/b/c"},
                rets_client:get(localhost,tibbe,a)).
 
-t12_leveldb_test_() ->
+t12_ets_test_()     -> t12_(ets).
+t12_leveldb_test_() -> t12_(leveldb).
+t12_(Backend) ->
   {setup,
    %% SETUP
    fun () ->
-       restart_rets(leveldb),
-       application:set_env(rets, keep_db, true)
+       application:set_env(rets, keep_db, true),
+       restart_rets(Backend)
    end,
    %% CLEANUP
    fun (_) ->
        application:set_env(rets, keep_db, false),
-       application:stop(rets)
+       restart_rets(Backend)
    end,
-   [fun t12/0
+   [{atom_to_list(Backend), fun () -> t12(Backend) end}
    ]}.
-t12() ->
+t12(Backend) ->
   %% Initially the DB is empty
   ?assertEqual({200,[]},
                rets_client:get(localhost)),
@@ -527,7 +529,7 @@ t12() ->
                rets_client:get(localhost,tebbe,a)),
 
   %% Restart rets when keep_db is set
-  restart_rets(leveldb),
+  restart_rets(Backend),
   
   %% Verify the data stayed
   ?assertEqual({200,[{tebbe,1}]},
@@ -537,14 +539,63 @@ t12() ->
   
   %% Restart rets when keep_db is not set
   application:set_env(rets, keep_db, false),
-  restart_rets(leveldb),
+  restart_rets(Backend),
   
   %% Verify the data vanished
   ?assertEqual({200,[]},
                rets_client:get(localhost)).
 
+t13_ets_test_() ->
+  {setup,
+   %% SETUP
+   fun () ->
+       application:set_env(rets, keep_db, true),
+       restart_rets(ets)
+   end,
+   %% CLEANUP
+   fun (_) ->
+       application:set_env(rets, keep_db, false),
+       restart_rets(ets)
+   end,
+   [fun t13/0
+   ]}.
+t13() ->
+  %% Create two tables
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,[{tebbe,0},{tibbe,0}]},
+               rets_client:get(localhost)),
+  
+  %% After restart: both tables & the index should be saved to disk
+  restart_rets(ets),
+  Files1 = file:list_dir("/tmp/rets/db"),
+  ?assertMatch({ok, _}, Files1),
+  ?assertEqual(["idx.term", "tebbe.tab","tibbe.tab"],
+               lists:sort(element(2, Files1))),
+  
+  %% Delete one of the tables
+  ?assertEqual({200,true},
+               rets_client:delete(localhost,tibbe)),
+  ?assertEqual({200,[{tebbe,0}]},
+               rets_client:get(localhost)),
+  
+  %% After restart: only one table & the index should be saved to disk
+  restart_rets(ets),
+  Files2 = file:list_dir("/tmp/rets/db"),
+  ?assertMatch({ok, _}, Files2),
+  ?assertEqual(["idx.term", "tebbe.tab"],
+               lists:sort(element(2, Files2))).
+
 restart_rets(Backend) ->
   application:stop(rets),
+  %% Ranch opens the server socket in a supervisor and never
+  %% explicitly closes it. So the socket is closed "shortly after" the
+  %% supervisor process terminates. But if we are not lucky and try to
+  %% restart very quickly we may get an `eaddrinuse'. So let's just
+  %% wait a little bit here.
+  timer:sleep(5),
   {ok,_} = start(Backend).
 
 -endif. % TEST

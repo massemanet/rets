@@ -8,7 +8,9 @@
 -author('mats cronqvist').
 
 %% the API
--export([state/0]).
+-export([state/0,
+         get_value/2
+        ]).
 
 %% for application supervisor
 -export([start_link/1]).
@@ -21,6 +23,14 @@
 %% the API
 state() ->
   gen_server:call(?MODULE,state).
+
+get_value(Key, Env) ->
+  proplists:get_value(Key, Env, default(Key)).
+
+default(backend)   -> ets;
+default(table_dir) -> "/tmp/rets/db";
+default(keep_db)   -> false;
+default(_)         -> undefined.
 
 %% for application supervisor
 start_link(Args) ->
@@ -85,15 +95,18 @@ expand_recs(Term) ->
 rec_info(state) -> record_info(fields,state).
 
 do_init(Args) ->
-  BE = proplists:get_value(backend,Args,leveldb),
+  keep_or_delete_db(Args),
+  BE = get_value(backend, Args),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
   {ok,#state{backend  = BE,
              env      = Args,
              cb_mod   = CB,
              cb_state = CB:init(Args)}}.
 
-do_terminate(State) ->
-  (State#state.cb_mod):terminate(State#state.cb_state).
+do_terminate(State = #state{env = Env}) ->
+  KeepDB = get_value(keep_db, Env),
+  (State#state.cb_mod):terminate(State#state.cb_state, KeepDB),
+  keep_or_delete_db(KeepDB, get_value(table_dir, Env)).
 
 do_handle_call({F,Args},State) ->
   try
@@ -101,4 +114,33 @@ do_handle_call({F,Args},State) ->
     {reply,{ok,Reply},State#state{cb_state=CBS}}
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}
+  end.
+
+keep_or_delete_db(Env) ->
+  keep_or_delete_db(get_value(keep_db,   Env),
+                    get_value(table_dir, Env)).
+
+keep_or_delete_db(true, _TableDir) ->
+  ok;
+keep_or_delete_db(false, TableDir) ->
+  IsFile = filelib:is_file(TableDir),
+  if IsFile -> delete_recursively(TableDir);
+     true   -> ok
+  end.
+
+delete_recursively(File) ->
+  case filelib:is_dir(File) of
+    true ->
+      {ok,Fs} = file:list_dir(File),
+      Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
+      lists:foreach(Del,Fs),
+      delete_file(del_dir,File);
+    false->
+      delete_file(delete,File)
+  end.
+
+delete_file(Op,File) ->
+  case file:Op(File) of
+    ok -> ok;
+    {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
   end.
