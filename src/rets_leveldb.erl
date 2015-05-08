@@ -97,8 +97,12 @@ siz() ->
 key_getter(S,Tab) ->
   Fun = fun(TK,Acc) -> [tk_key(TK)|Acc] end,
   Iter = lvl_iter(S,keys_only),
-  R = fold_loop(lvl_mv_iter(Iter,Tab),Tab,Iter,Fun,[]),
-  lists:reverse(R).
+  try
+    R = fold_loop(lvl_mv_iter(Iter,Tab),Tab,Iter,Fun,[]),
+    lists:reverse(R)
+  after
+    lvl_close_iter(Iter)
+  end.
 
 fold_loop(invalid_iterator,_,_,_,Acc) ->
   Acc;
@@ -196,7 +200,11 @@ nextprev(S,OP,Tab,Key) ->
 
 nextprev(S,OP,TK) ->
   Iter = lvl_iter(S,key_vals),
-  check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK).
+  try
+    check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK)
+  after
+    lvl_close_iter(Iter)
+  end.
 
 check_np(prev,invalid_iterator,Iter,TK) ->
   %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
@@ -329,6 +337,9 @@ lvl_iter(S,What) ->
       key_vals  -> eleveldb:iterator(S#state.handle,[])
     end,
   Iter.
+
+lvl_close_iter(Iter) ->
+  eleveldb:iterator_close(Iter).
 
 lvl_mv_iter(Iter,Where) ->
   case eleveldb:iterator_move(Iter,Where) of
