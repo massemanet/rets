@@ -29,25 +29,24 @@
                 idx
                }).
 
--define(index, "idx.term").
+index_filename() -> "idx.term".
 
 init(Env) ->
-  Dir = rets_handler:get_value(table_dir, Env),
-  Idx = filename:join(Dir, ?index),
+  Dir = proplists:get_value(table_dir,Env),
+  Idx = filename:join(Dir,index_filename()),
   ok = filelib:ensure_dir(Idx),
-  load_db(#state{dir = Dir, idx = Idx}).
+  load_db(#state{dir = Dir,idx = Idx}).
 
 load_db(State = #state{dir = Dir, idx = Idx}) ->
   case file:consult(Idx) of
     {ok, Ts} ->
       Tables = lists:sort([load_table(Dir, T) || T <- Ts, is_atom(T)]),
-      State#state{tables       = Tables,
-                  start_tables = Tables};
+      State#state{tables = Tables,start_tables = Tables};
     {error, _} ->
       State
   end.
 
-load_table(Dir, T) when is_atom(T) ->
+load_table(Dir,T) when is_atom(T) ->
   Tab  = atom_to_list(T),
   File = tab_file_name(Dir, Tab),
   {ok, T} = ets:file2tab(File),
@@ -68,10 +67,11 @@ save_db(#state{tables       = Tabs,
 
   %% Delete those tabs that were saved the last time the backend was
   %% stopped but no longer exists
-  [ok = file:delete(tab_file_name(Dir, Tab))
-   || Tab <- ordsets:subtract(StartTabs, Tabs)],
-
+  [delete_tab(Dir,Tab) || Tab <- ordsets:subtract(StartTabs,Tabs)],
   ok.
+
+delete_tab(Dir,Tab) ->
+  ok = file:delete(tab_file_name(Dir,Tab)).
 
 save_table(Dir, Tab) when is_list(Tab) ->
   T = list_to_atom(Tab),
@@ -83,22 +83,21 @@ tab_file_name(Dir, Tab) when is_list(Tab) ->
   filename:join(Dir, Tab ++ ".tab").
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])            -> creat(S,Tab).
-delete(S ,[Tab])            -> delet(S,Tab);
-delete(S ,[Tab,Key])        -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
-sizes(S  ,[])               -> {siz(S),S}.
-keys(S   ,[Tab])            -> {key_getter(tab(Tab)),S}.
-insert(S ,[Tab,KVs])        -> {ins(tab(Tab),[{key_e2i(i,K),V}
-                                              || {K,V} <- KVs]),S};
-insert(S ,[Tab,K,V])        -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
-bump(S   ,[Tab,Key,I])      -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
-bump(S   ,[Tab,Key,L,H])    -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
-reset(S  ,[Tab,Key,I])      -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
-next(S   ,[Tab,Key])        -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
-prev(S   ,[Tab,Key])        -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
-multi(S  ,[Tab,Key])        -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
-single(S ,[Tab,Key])        -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
-via(S    ,[Tab1,Tab2,Key2]) -> {via(tab(Tab1),tab(Tab2),key_e2i(i,Key2)),S}.
+create(S ,[Tab])          -> creat(S,Tab).
+delete(S ,[Tab])          -> delet(S,Tab);
+delete(S ,[Tab,Key])      -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
+sizes(S  ,[])             -> {siz(S),S}.
+keys(S   ,[Tab])          -> {key_getter(tab(Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(tab(Tab),[{key_e2i(i,K),V}||{K,V}<-KVs]),S};
+insert(S ,[Tab,K,V])      -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
+next(S   ,[Tab,Key])      -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
+prev(S   ,[Tab,Key])      -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
+multi(S  ,[Tab,Key])      -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
+single(S ,[Tab,Key])      -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(tab(TabI),tab(Tab),key_e2i(i,Key)),S}.
 
 creat(S,Tab) ->
   case lists:member(Tab,S#state.tables) of

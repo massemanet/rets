@@ -13,8 +13,6 @@
          trace/1,trace/2]).
 
 -define(is_string(S), S=="";is_integer(hd(S))).
--define(http_timeout, infinity).
--define(http_opts,    [{max_connections, 10000}]).
 
 get(Host) ->
   atomize(get(Host,"")).
@@ -80,9 +78,12 @@ httpc_request(M,Host,Tab,Key,Headers,PL) ->
   end.
 
 httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
-  lhttpc:request(URL, M, Headers, [], ?http_timeout, ?http_opts);
+  lhttpc:request(URL,M,Headers,[],http_timeout(),http_opts());
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
-  lhttpc:request(URL, M, Headers, PL, ?http_timeout, ?http_opts).
+  lhttpc:request(URL,M,Headers,PL,http_timeout(),http_opts()).
+
+http_timeout() -> infinity.
+http_opts() -> [{max_connections, 10000}].
 
 url(Host,Tab,Key) ->
   Prot = "http",

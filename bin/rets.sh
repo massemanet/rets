@@ -70,15 +70,11 @@ item_start() {
         -sname $ITEM_SNAME \
         -setcookie $ITEM \
         -boot start_sasl \
-<<<<<<< HEAD
         -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
-        -rets backend $ITEM_BACKEND \
-=======
         -kernel error_logger \"{file,\\\"$ITEM_ERLLOG\\\"}\" \
-        -rets backend leveld \
+        -rets backend $ITEM_BACKEND \
         -rets table_dir \"$ITEM_TABDIR\" \
         -rets keep_db false \
->>>>>>> 96e15cd... [GBL-19940] Allow keeping the LevelDB data on restart
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \

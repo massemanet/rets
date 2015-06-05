@@ -74,24 +74,23 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("PUT",   [Tab]    ,[],_)              -> g({create,[Tab]});
-x("PUT",   [Tab|Key],["indirect",T],_)  -> g({via,   [T,Tab,chkk(Key)]});
-x("PUT",   [Tab|Key],[],R)              -> g({insert,[Tab,chkk(Key),body(R)]});
-x("PUT",   [Tab|Key],["counter"],_)     -> g({bump,  [Tab,chkk(Key),1]});
-x("PUT",   [Tab|Key],["counter",L,H],_) -> g({bump,  [Tab,chkk(Key),i(L),i(H)
-                                                     ]});
-x("PUT",   [Tab|Key],["reset"],_)       -> g({reset, [Tab,chkk(Key),0]});
-x("GET",   []       ,[],_)              -> g({sizes, []});
-x("GET",   [Tab]    ,[],_)              -> g({keys,  [Tab]});
-x("GET",   [Tab|Key],[],_)              -> g({single,[Tab,Key]});
-x("GET",   [Tab|Key],["multi"],_)       -> g({multi, [Tab,Key]});
-x("GET",   [Tab|Key],["next"],_)        -> g({next,  [Tab,Key]});
-x("GET",   [Tab|Key],["prev"],_)        -> g({prev,  [Tab,Key]});
-x("POST",  [Tab]    ,[],R)              -> g({insert,[Tab,chkb(body(R))]});
-x("DELETE",[Tab]    ,[],_)              -> g({delete,[Tab]});
-x("DELETE",[Tab|Key],[],_)              -> g({delete,[Tab,Key]});
-x("TRACE",_,_,_)                        -> throw({405,"method not allowed"});
-x(Meth,URI,Headers,Bdy)                 -> throw({404,{Meth,URI,Headers,Bdy}}).
+x("PUT",   [Tab]    ,[],_)             -> g({create,[Tab]});
+x("PUT",   [Tab|Key],["indirect",T],_) -> g({via,   [Tab,chkk(Key),T]});
+x("PUT",   [Tab|Key],[],R)             -> g({insert,[Tab,chkk(Key),body(R)]});
+x("PUT",   [Tab|Key],["counter"],_)    -> g({bump,  [Tab,chkk(Key),1]});
+x("PUT",   [Tab|Key],["counter",L,H],_)-> g({bump,  [Tab,chkk(Key),i(L),i(H)]});
+x("PUT",   [Tab|Key],["reset"],_)      -> g({reset, [Tab,chkk(Key),0]});
+x("GET",   []       ,[],_)             -> g({sizes, []});
+x("GET",   [Tab]    ,[],_)             -> g({keys,  [Tab]});
+x("GET",   [Tab|Key],[],_)             -> g({single,[Tab,Key]});
+x("GET",   [Tab|Key],["multi"],_)      -> g({multi, [Tab,Key]});
+x("GET",   [Tab|Key],["next"],_)       -> g({next,  [Tab,Key]});
+x("GET",   [Tab|Key],["prev"],_)       -> g({prev,  [Tab,Key]});
+x("POST",  [Tab]    ,[],R)             -> g({insert,[Tab,chkb(body(R))]});
+x("DELETE",[Tab]    ,[],_)             -> g({delete,[Tab]});
+x("DELETE",[Tab|Key],[],_)             -> g({delete,[Tab,Key]});
+x("TRACE",_,_,_)                       -> throw({405,"method not allowed"});
+x(Meth,URI,Headers,Bdy)                -> throw({404,{Meth,URI,Headers,Bdy}}).
 
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
@@ -109,7 +108,7 @@ chk_el(El)  -> El.
 
 i(Str) ->
   try list_to_integer(Str)
-  catch error:badarg -> throw({400,not_an_integer})
+  catch error:badarg -> throw({404,not_an_integer,Str})
   end.
 
 body(Req) ->
@@ -178,6 +177,13 @@ je(Term) ->
 %% eunit
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+null_ets_test() -> null_test(ets).
+null_leveldb_test() -> null_test(leveldb).
+null_test(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual(Backend,
+               proplists:get_value(backend,rets:state())).
 
 t00_ets_test()     -> t00(ets).
 t00_leveldb_test() -> t00(leveldb).
@@ -276,6 +282,27 @@ t03(Backend) ->
                rets_client:put(localhost,tibbe,bbb,reset)),
   ?assertEqual({200,1},
                rets_client:put(localhost,tibbe,bbb,counter)).
+
+t031_ets_test()     -> t031(ets).
+t031_leveldb_test() -> t031(leveldb).
+t031(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,0},
+               rets_client:put(localhost,tibbe,bbb,reset)),
+  ?assertEqual({200,1},
+               rets_client:put(localhost,tibbe,bbb,{counter,1,1})).
 
 t04_ets_test()     -> t04(ets).
 t04_leveldb_test() -> t04(leveldb).
@@ -530,17 +557,17 @@ t12(Backend) ->
 
   %% Restart rets when keep_db is set
   restart_rets(Backend),
-  
+
   %% Verify the data stayed
   ?assertEqual({200,[{tebbe,1}]},
                rets_client:get(localhost)),
   ?assertEqual({200,1},
                rets_client:get(localhost,tebbe,a)),
-  
+
   %% Restart rets when keep_db is not set
   application:set_env(rets, keep_db, false),
   restart_rets(Backend),
-  
+
   %% Verify the data vanished
   ?assertEqual({200,[]},
                rets_client:get(localhost)).
@@ -567,20 +594,20 @@ t13() ->
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,[{tebbe,0},{tibbe,0}]},
                rets_client:get(localhost)),
-  
+
   %% After restart: both tables & the index should be saved to disk
   restart_rets(ets),
   Files1 = file:list_dir("/tmp/rets/db"),
   ?assertMatch({ok, _}, Files1),
   ?assertEqual(["idx.term", "tebbe.tab","tibbe.tab"],
                lists:sort(element(2, Files1))),
-  
+
   %% Delete one of the tables
   ?assertEqual({200,true},
                rets_client:delete(localhost,tibbe)),
   ?assertEqual({200,[{tebbe,0}]},
                rets_client:get(localhost)),
-  
+
   %% After restart: only one table & the index should be saved to disk
   restart_rets(ets),
   Files2 = file:list_dir("/tmp/rets/db"),

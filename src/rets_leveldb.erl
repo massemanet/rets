@@ -31,10 +31,9 @@
 
 init(Env) ->
   ets:new(leveldb_tabs,[ordered_set,named_table,public]),
-  Dir = rets_handler:get_value(table_dir, Env),
+  Dir = proplists:get_value(table_dir,Env),
   filelib:ensure_dir(Dir),
-  State = #state{handle = lvl_open(Dir),
-                 dir = Dir},
+  State = #state{handle = lvl_open(Dir),dir = Dir},
   restore_meta_data(State),
   State.
 
@@ -82,21 +81,21 @@ recreate_meta_data(TK, I, LastTab) ->
   recreate_meta_data(lvl_mv_iter(I, next), I, ThisTab).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])            -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])            -> {delete_tab(S,tab_name(Tab)),S};
-delete(S ,[Tab,Key])        -> {deleter(S,tab(Tab),Key),S}.
-sizes(S  ,[])               -> {siz(),S}.
-keys(S   ,[Tab])            -> {key_getter(S,tab(Tab)),S}.
-insert(S ,[Tab,KVs])        -> {ins(S,tab(Tab),KVs),S};
-insert(S ,[Tab,K,V])        -> {ins(S,tab(Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I])      -> {update_counter(S,tab(Tab),Key,I),S};
-bump(S   ,[Tab,Key,L,H])    -> {update_counter(S,tab(Tab),Key,L,H),S}.
-reset(S  ,[Tab,Key,I])      -> {reset_counter(S,tab(Tab),Key,I),S}.
-next(S   ,[Tab,Key])        -> {nextprev(S,next,tab(Tab),Key),S}.
-prev(S   ,[Tab,Key])        -> {nextprev(S,prev,tab(Tab),Key),S}.
-multi(S  ,[Tab,Key])        -> {getter(S,multi,tab(Tab),Key),S}.
-single(S ,[Tab,Key])        -> {getter(S,single,tab(Tab),Key),S}.
-via(S    ,[Tab1,Tab2,Key2]) -> {via(S,tab(Tab1),tab(Tab2),Key2),S}.
+create(S ,[Tab])          -> {create(tab_name(Tab)),S}.
+delete(S ,[Tab])          -> {delete_tab(S,tab_name(Tab)),S};
+delete(S ,[Tab,Key])      -> {deleter(S,tab(Tab),Key),S}.
+sizes(S  ,[])             -> {siz(),S}.
+keys(S   ,[Tab])          -> {key_getter(S,tab(Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(S,tab(Tab),KVs),S};
+insert(S ,[Tab,K,V])      -> {ins(S,tab(Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(S,tab(Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(S,tab(Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(S,tab(Tab),Key,I),S}.
+next(S   ,[Tab,Key])      -> {nextprev(S,next,tab(Tab),Key),S}.
+prev(S   ,[Tab,Key])      -> {nextprev(S,prev,tab(Tab),Key),S}.
+multi(S  ,[Tab,Key])      -> {getter(S,multi,tab(Tab),Key),S}.
+single(S ,[Tab,Key])      -> {getter(S,single,tab(Tab),Key),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(S,tab(TabI),tab(Tab),Key),S}.
 
 create(Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of

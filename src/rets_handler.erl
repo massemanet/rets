@@ -8,9 +8,7 @@
 -author('mats cronqvist').
 
 %% the API
--export([state/0,
-         get_value/2
-        ]).
+-export([state/0]).
 
 %% for application supervisor
 -export([start_link/1]).
@@ -24,14 +22,6 @@
 state() ->
   gen_server:call(?MODULE,state).
 
-get_value(Key, Env) ->
-  proplists:get_value(Key, Env, default(Key)).
-
-default(backend)   -> ets;
-default(table_dir) -> "/tmp/rets/db";
-default(keep_db)   -> false;
-default(_)         -> undefined.
-
 %% for application supervisor
 start_link(Args) ->
   gen_server:start_link({local,?MODULE},?MODULE,Args,[]).
@@ -40,6 +30,7 @@ start_link(Args) ->
 init(Args) ->
   process_flag(trap_exit, true),
   do_init(Args).
+
 terminate(shutdown,State) ->
   do_terminate(State).
 
@@ -84,8 +75,10 @@ expand_recs(Term) ->
 -record(state,{
           %% Settable parameters
           %% Set from erl start command (erl -rets backend leveldb)
-          backend,  %% leveldb|ets
-          env,      %% result of application:get_all_env(rets)
+          backend   = leveldb, %% leveldb|ets
+          env       = [],      %% result of application:get_all_env(rets)
+          table_dir = "/tmp/rets/db",
+          keep_db   = false,
 
           %% Non-settable paramaters
           cb_mod,  %% rets BE callback module
@@ -95,18 +88,23 @@ expand_recs(Term) ->
 rec_info(state) -> record_info(fields,state).
 
 do_init(Args) ->
-  keep_or_delete_db(Args),
-  BE = get_value(backend, Args),
+  S  = #state{},
+  BE = getv(backend,Args,S#state.backend),
+  KD = getv(keep_db,Args,S#state.keep_db),
+  TD = getv(table_dir,Args,S#state.table_dir),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
-  {ok,#state{backend  = BE,
-             env      = Args,
-             cb_mod   = CB,
-             cb_state = CB:init(Args)}}.
+  keep_or_delete_db(KD,TD),
+  {ok,S#state{
+        backend   = BE,
+        table_dir = TD,
+        keep_db   = KD,
+        env       = Args,
+        cb_mod    = CB,
+        cb_state  = CB:init([{keep_db,KD},{table_dir,TD}])}}.
 
-do_terminate(State = #state{env = Env}) ->
-  KeepDB = get_value(keep_db, Env),
-  (State#state.cb_mod):terminate(State#state.cb_state, KeepDB),
-  keep_or_delete_db(KeepDB, get_value(table_dir, Env)).
+do_terminate(S) ->
+  (S#state.cb_mod):terminate(S#state.cb_state,S#state.keep_db),
+  keep_or_delete_db(S#state.keep_db,S#state.table_dir).
 
 do_handle_call({F,Args},State) ->
   try
@@ -116,26 +114,22 @@ do_handle_call({F,Args},State) ->
     throw:{Status,Term} -> {reply,{Status,Term},State}
   end.
 
-keep_or_delete_db(Env) ->
-  keep_or_delete_db(get_value(keep_db,   Env),
-                    get_value(table_dir, Env)).
+keep_or_delete_db(true,_TableDir) -> ok;
+keep_or_delete_db(false,TableDir) -> delete_recursively(TableDir).
 
-keep_or_delete_db(true, _TableDir) ->
-  ok;
-keep_or_delete_db(false, TableDir) ->
-  IsFile = filelib:is_file(TableDir),
-  if IsFile -> delete_recursively(TableDir);
-     true   -> ok
-  end.
+-include_lib("kernel/include/file.hrl").
+-define(filetype(Type), #file_info{type=Type}).
 
 delete_recursively(File) ->
-  case filelib:is_dir(File) of
-    true ->
+  case file:read_file_info(File) of
+    {error,enoent} ->
+      ok;
+    {ok,?filetype(directory)} ->
       {ok,Fs} = file:list_dir(File),
       Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
       lists:foreach(Del,Fs),
       delete_file(del_dir,File);
-    false->
+    {ok,?filetype(regular)} ->
       delete_file(delete,File)
   end.
 
@@ -144,3 +138,6 @@ delete_file(Op,File) ->
     ok -> ok;
     {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
   end.
+
+getv(K,PL,Def) ->
+  proplists:get_value(K,PL,Def).
