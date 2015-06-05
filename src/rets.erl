@@ -74,21 +74,23 @@ reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 reply(Req) ->
   x(method(Req),uri(Req),rets_headers(Req),Req).
 
-x("PUT",   [Tab]    ,[],_)          -> g({create,[Tab]});
-x("PUT",   [Tab|Key],[],R)          -> g({insert,[Tab,chkk(Key),body(R)]});
-x("PUT",   [Tab|Key],["counter"],_) -> g({bump,  [Tab,chkk(Key),1]});
-x("PUT",   [Tab|Key],["reset"],_)   -> g({reset, [Tab,chkk(Key),0]});
-x("GET",   []       ,[],_)          -> g({sizes, []});
-x("GET",   [Tab]    ,[],_)          -> g({keys,  [Tab]});
-x("GET",   [Tab|Key],[],_)          -> g({single,[Tab,Key]});
-x("GET",   [Tab|Key],["multi"],_)   -> g({multi, [Tab,Key]});
-x("GET",   [Tab|Key],["next"],_)    -> g({next,  [Tab,Key]});
-x("GET",   [Tab|Key],["prev"],_)    -> g({prev,  [Tab,Key]});
-x("POST",  [Tab]    ,[],R)          -> g({insert,[Tab,chkb(body(R))]});
-x("DELETE",[Tab]    ,[],_)          -> g({delete,[Tab]});
-x("DELETE",[Tab|Key],[],_)          -> g({delete,[Tab,Key]});
-x("TRACE",_,_,_)                    -> throw({405,"method not allowed"});
-x(Meth,URI,Headers,Bdy)             -> throw({404,{Meth,URI,Headers,Bdy}}).
+x("PUT",   [Tab]    ,[],_)             -> g({create,[Tab]});
+x("PUT",   [Tab|Key],["indirect",T],_) -> g({via,   [Tab,chkk(Key),T]});
+x("PUT",   [Tab|Key],[],R)             -> g({insert,[Tab,chkk(Key),body(R)]});
+x("PUT",   [Tab|Key],["counter"],_)    -> g({bump,  [Tab,chkk(Key),1]});
+x("PUT",   [Tab|Key],["counter",L,H],_)-> g({bump,  [Tab,chkk(Key),i(L),i(H)]});
+x("PUT",   [Tab|Key],["reset"],_)      -> g({reset, [Tab,chkk(Key),0]});
+x("GET",   []       ,[],_)             -> g({sizes, []});
+x("GET",   [Tab]    ,[],_)             -> g({keys,  [Tab]});
+x("GET",   [Tab|Key],[],_)             -> g({single,[Tab,Key]});
+x("GET",   [Tab|Key],["multi"],_)      -> g({multi, [Tab,Key]});
+x("GET",   [Tab|Key],["next"],_)       -> g({next,  [Tab,Key]});
+x("GET",   [Tab|Key],["prev"],_)       -> g({prev,  [Tab,Key]});
+x("POST",  [Tab]    ,[],R)             -> g({insert,[Tab,chkb(body(R))]});
+x("DELETE",[Tab]    ,[],_)             -> g({delete,[Tab]});
+x("DELETE",[Tab|Key],[],_)             -> g({delete,[Tab,Key]});
+x("TRACE",_,_,_)                       -> throw({405,"method not allowed"});
+x(Meth,URI,Headers,Bdy)                -> throw({404,{Meth,URI,Headers,Bdy}}).
 
 g(FArgs) ->
   case gen_server:call(rets_handler,FArgs) of
@@ -103,6 +105,11 @@ chk_bp({Key,Val}) ->
 chkk(Key) -> lists:map(fun chk_el/1,Key).
 chk_el(".") -> throw({404,key_element_is_period});
 chk_el(El)  -> El.
+
+i(Str) ->
+  try list_to_integer(Str)
+  catch error:badarg -> throw({404,not_an_integer,Str})
+  end.
 
 body(Req) ->
   case cowboy_req:has_body(Req) of
@@ -170,6 +177,13 @@ je(Term) ->
 %% eunit
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+null_ets_test() -> null_test(ets).
+null_leveldb_test() -> null_test(leveldb).
+null_test(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual(Backend,
+               proplists:get_value(backend,rets:state())).
 
 t00_ets_test()     -> t00(ets).
 t00_leveldb_test() -> t00(leveldb).
@@ -268,6 +282,27 @@ t03(Backend) ->
                rets_client:put(localhost,tibbe,bbb,reset)),
   ?assertEqual({200,1},
                rets_client:put(localhost,tibbe,bbb,counter)).
+
+t031_ets_test()     -> t031(ets).
+t031_leveldb_test() -> t031(leveldb).
+t031(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,0},
+               rets_client:put(localhost,tibbe,bbb,reset)),
+  ?assertEqual({200,1},
+               rets_client:put(localhost,tibbe,bbb,{counter,1,1})).
 
 t04_ets_test()     -> t04(ets).
 t04_leveldb_test() -> t04(leveldb).
@@ -398,8 +433,196 @@ t09(Backend) ->
   ?assertEqual({200,[{"a",1}]},
                rets_client:get(localhost,tebbe,0,next)).
 
+t10_ets_test()     -> t10(ets).
+t10_leveldb_test() -> t10(leveldb).
+t10(Backend) ->
+  %% This test verifies that if we have multiple tables performing a
+  %% next on the first table's last element won't return the second
+  %% table's first element.
+  restart_rets(Backend),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+
+  %% Verify empty tables
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,0,next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tibbe,0,next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,0,prev)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tibbe,0,prev)),
+
+  %% Add some records
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,a,1)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,b,2)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe,c,3)),
+  ?assertEqual({200,[{tebbe,2},{tibbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+  ?assertEqual({200,2},
+               rets_client:get(localhost,tebbe,b)),
+  ?assertEqual({404,"no_such_key"},
+               rets_client:get(localhost,tebbe,c)),
+  ?assertEqual({200,3},
+               rets_client:get(localhost,tibbe,c)),
+
+  %% Verify next
+  ?assertEqual({200,[{"a",1}]},
+               rets_client:get(localhost,tebbe,0,next)),
+  ?assertEqual({200,[{"b",2}]},
+               rets_client:get(localhost,tebbe,"a",next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,"b",next)),
+  ?assertEqual({200,[{"c",3}]},
+               rets_client:get(localhost,tibbe,0,next)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tibbe,"c",next)),
+
+  %% Verify prev
+  ?assertEqual({200,[{"b",2}]},
+               rets_client:get(localhost,tebbe,"z",prev)),
+  ?assertEqual({200,[{"a",1}]},
+               rets_client:get(localhost,tebbe,"b",prev)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tebbe,"a",prev)),
+  ?assertEqual({200,[{"c",3}]},
+               rets_client:get(localhost,tibbe,"z",prev)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:get(localhost,tibbe,"c",prev)).
+
+t11_ets_test()     -> t11(ets).
+t11_leveldb_test() -> t11(leveldb).
+t11(Backend) ->
+  restart_rets(Backend),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({409,"end_of_table"},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,'a/b/c',foo)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,'x/y/z',bar)),
+  ?assertEqual({200,[{"a/b/c","foo"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"a/b/c"},
+               rets_client:get(localhost,tibbe,a)),
+  ?assertEqual({200,[{"x/y/z","bar"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"x/y/z"},
+               rets_client:get(localhost,tibbe,a)),
+  ?assertEqual({200,[{"a/b/c","foo"}]},
+               rets_client:put(localhost,tibbe,a,{indirect,tebbe})),
+  ?assertEqual({200,"a/b/c"},
+               rets_client:get(localhost,tibbe,a)).
+
+t12_ets_test_()     -> t12_(ets).
+t12_leveldb_test_() -> t12_(leveldb).
+t12_(Backend) ->
+  {setup,
+   %% SETUP
+   fun () ->
+       application:set_env(rets, keep_db, true),
+       restart_rets(Backend)
+   end,
+   %% CLEANUP
+   fun (_) ->
+       application:set_env(rets, keep_db, false),
+       restart_rets(Backend)
+   end,
+   [{atom_to_list(Backend), fun () -> t12(Backend) end}
+   ]}.
+t12(Backend) ->
+  %% Initially the DB is empty
+  ?assertEqual({200,[]},
+               rets_client:get(localhost)),
+
+  %% Add some data
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tebbe,a,1)),
+  ?assertEqual({200,[{tebbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+
+  %% Restart rets when keep_db is set
+  restart_rets(Backend),
+
+  %% Verify the data stayed
+  ?assertEqual({200,[{tebbe,1}]},
+               rets_client:get(localhost)),
+  ?assertEqual({200,1},
+               rets_client:get(localhost,tebbe,a)),
+
+  %% Restart rets when keep_db is not set
+  application:set_env(rets, keep_db, false),
+  restart_rets(Backend),
+
+  %% Verify the data vanished
+  ?assertEqual({200,[]},
+               rets_client:get(localhost)).
+
+t13_ets_test_() ->
+  {setup,
+   %% SETUP
+   fun () ->
+       application:set_env(rets, keep_db, true),
+       restart_rets(ets)
+   end,
+   %% CLEANUP
+   fun (_) ->
+       application:set_env(rets, keep_db, false),
+       restart_rets(ets)
+   end,
+   [fun t13/0
+   ]}.
+t13() ->
+  %% Create two tables
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tebbe)),
+  ?assertEqual({200, true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,[{tebbe,0},{tibbe,0}]},
+               rets_client:get(localhost)),
+
+  %% After restart: both tables & the index should be saved to disk
+  restart_rets(ets),
+  Files1 = file:list_dir("/tmp/rets/db"),
+  ?assertMatch({ok, _}, Files1),
+  ?assertEqual(["idx.term", "tebbe.tab","tibbe.tab"],
+               lists:sort(element(2, Files1))),
+
+  %% Delete one of the tables
+  ?assertEqual({200,true},
+               rets_client:delete(localhost,tibbe)),
+  ?assertEqual({200,[{tebbe,0}]},
+               rets_client:get(localhost)),
+
+  %% After restart: only one table & the index should be saved to disk
+  restart_rets(ets),
+  Files2 = file:list_dir("/tmp/rets/db"),
+  ?assertMatch({ok, _}, Files2),
+  ?assertEqual(["idx.term", "tebbe.tab"],
+               lists:sort(element(2, Files2))).
+
 restart_rets(Backend) ->
   application:stop(rets),
+  %% Ranch opens the server socket in a supervisor and never
+  %% explicitly closes it. So the socket is closed "shortly after" the
+  %% supervisor process terminates. But if we are not lucky and try to
+  %% restart very quickly we may get an `eaddrinuse'. So let's just
+  %% wait a little bit here.
+  timer:sleep(5),
   {ok,_} = start(Backend).
 
 -endif. % TEST

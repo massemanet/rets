@@ -38,6 +38,10 @@ delete(Host,Tab,Key) ->
 
 put(Host,Tab) ->
   put(Host,Tab,"",[]).
+put(Host,Tab,Key,{indirect,T}) ->
+  put(Host,Tab,Key,[{"rets","indirect," ++ to_list(T)}],[],[]);
+put(Host,Tab,Key,{counter,L,H}) ->
+  put(Host,Tab,Key,[{"rets",string:join(["counter",s(L),s(H)],",")}],[],[]);
 put(Host,Tab,Key,counter) ->
   put(Host,Tab,Key,[{"rets","counter"}],[],[]);
 put(Host,Tab,Key,reset) ->
@@ -62,24 +66,24 @@ trace(Host,Headers) ->
 httpc_request(M,Host,Tab,Key,Headers) ->
   httpc_request(M,Host,Tab,Key,Headers,[]).
 httpc_request(M,Host,Tab,Key,Headers,PL) ->
-  start_app(inets),
+  application:ensure_all_started(lhttpc),
   case httpc_request(M,url(Host,Tab,Key),Headers,enc(prep(PL))) of
-    {ok,{{_HttpVersion,Status,_StatusText},_Headers,Reply}} ->
+    {ok,{{Status,_StatusText},_Headers,Reply}} ->
       case Status of
         200 -> {200,unprep(dec(Reply))};
-        _   -> {Status,Reply}
+        _   -> {Status,binary_to_list(Reply)}
       end;
     Error->
       Error
   end.
 
 httpc_request(M,URL,Headers,<<"\"\"">>) when M==trace; M==get; M==delete ->
-  httpc:request(M,{URL,Headers},[],[]);
+  lhttpc:request(URL,M,Headers,[],http_timeout(),http_opts());
 httpc_request(M,URL,Headers,PL) when M==post; M==put ->
-  httpc:request(M,{URL,Headers,[],PL},[],[]).
+  lhttpc:request(URL,M,Headers,PL,http_timeout(),http_opts()).
 
-start_app(M) ->
-  [M:start() || false=:=lists:keysearch(M,1,application:which_applications())].
+http_timeout() -> infinity.
+http_opts() -> [{max_connections, 10000}].
 
 url(Host,Tab,Key) ->
   Prot = "http",
@@ -131,3 +135,6 @@ enc(Term) ->
 
 dec(Term) ->
   jiffy:decode(Term).
+
+s(Integer) ->
+  integer_to_list(Integer).

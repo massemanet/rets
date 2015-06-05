@@ -2,9 +2,9 @@
 
 REBAR   ?= $(shell which rebar 2> /dev/null || which ./rebar)
 
-.PHONY: all clean test compile rpm get-deps update-deps
+.PHONY: all compile compile-all get-deps update-deps clean test
+.PHONY: release release_patch release_minor release_major
 .PHONY: eunit xref dialyze
-.PHONY: release release_minor release_major
 
 all: compile
 
@@ -20,9 +20,6 @@ get-deps:
 update-deps:
 	@$(REBAR) update-deps
 	@$(REBAR) get-deps
-
-cleanish:
-	@rm -rf .eunit
 
 clean:
 	@find . -name "*~" -exec rm {} \;

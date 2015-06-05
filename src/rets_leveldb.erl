@@ -7,7 +7,7 @@
 -module('rets_leveldb').
 -author('Mats Cronqvist').
 -export([init/1,
-         terminate/1,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -18,55 +18,84 @@
          next/2,
          prev/2,
          multi/2,
-         single/2]).
+         single/2,
+         via/2
+        ]).
 
 -record(state,
         {tables=[],
          handle,
          dir}).
 
+-define(tabs_key, <<"$leveldb_tabs$">>).
+
 init(Env) ->
   ets:new(leveldb_tabs,[ordered_set,named_table,public]),
-  Dir = proplists:get_value(table_dir,Env,"/tmp/rets/leveldb"),
+  Dir = proplists:get_value(table_dir,Env),
   filelib:ensure_dir(Dir),
-  #state{handle = lvl_open(Dir),
-         dir = Dir}.
+  State = #state{handle = lvl_open(Dir),dir = Dir},
+  restore_meta_data(State),
+  State.
 
-terminate(S) ->
-  lvl_close(S),
-  delete_recursively(S#state.dir).
+terminate(S, KeepDB) ->
+  if KeepDB -> persist_db(S);
+     true   -> ok
+  end,
+  lvl_close(S).
 
-delete_recursively(File) ->
-  case filelib:is_dir(File) of
-    true ->
-      {ok,Fs} = file:list_dir(File),
-      Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
-      lists:foreach(Del,Fs),
-      delete_file(del_dir,File);
-    false->
-      delete_file(delete,File)
+persist_db(S) ->
+  %% Some meta-data about the tables is stored in ETS. It is possible
+  %% to reconstruct this information from the raw data in LevelDB, but
+  %% it is expensive. It makes more sense to save the meta-data with
+  %% the regular data (under a special key that otherwise cannot be
+  %% used in rets).
+  do_ins(S, ?tabs_key, ets:tab2list(leveldb_tabs)).
+
+restore_meta_data(S) ->
+  %% Try to restore the meta-data saved by `persist_db' into the ETS
+  %% table.
+  case lvl_get(S, ?tabs_key) of
+    not_found ->
+      %% Recreate the meta-data by traversing the table
+      recreate_meta_data(S);
+    Meta when is_list(Meta) ->
+      ets:insert(leveldb_tabs, Meta),
+      %% Delete the special key, so if we crash the next restart would
+      %% rather recreate the meta-data from scratch than use this
+      %% outdated information
+      lvl_delete(S, ?tabs_key)
   end.
 
-delete_file(Op,File) ->
-  case file:Op(File) of
-    ok -> ok;
-    {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
-  end.
+recreate_meta_data(S) ->
+  I = lvl_iter(S, keys_only),
+  recreate_meta_data(lvl_mv_iter(I, first), I, <<>>).
+
+recreate_meta_data(invalid_iterator, _I, _LastTab) ->
+  ok;
+recreate_meta_data(TK, I, LastTab) ->
+  ThisTab = tk_tab(TK),
+  case ThisTab of
+    LastTab -> ets:update_counter(leveldb_tabs, ThisTab, 1);
+    _       -> ets:insert(leveldb_tabs, {ThisTab, 1})
+  end,
+  recreate_meta_data(lvl_mv_iter(I, next), I, ThisTab).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])       -> {create(tab_name(Tab)),S}.
-delete(S ,[Tab])       -> {delete(tab_name(Tab)),S};
-delete(S ,[Tab,Key])   -> {deleter(S,tab(Tab),Key),S}.
-sizes(S  ,[])          -> {siz(),S}.
-keys(S   ,[Tab])       -> {key_getter(S,tab(Tab)),S}.
-insert(S ,[Tab,KVs])   -> {ins(S,tab(Tab),KVs),S};
-insert(S ,[Tab,K,V])   -> {ins(S,tab(Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I]) -> {update_counter(S,tab(Tab),Key,I),S}.
-reset(S  ,[Tab,Key,I]) -> {reset_counter(S,tab(Tab),Key,I),S}.
-next(S   ,[Tab,Key])   -> {nextprev(S,next,tab(Tab),Key),S}.
-prev(S   ,[Tab,Key])   -> {nextprev(S,prev,tab(Tab),Key),S}.
-multi(S  ,[Tab,Key])   -> {getter(S,multi,tab(Tab),Key),S}.
-single(S ,[Tab,Key])   -> {getter(S,single,tab(Tab),Key),S}.
+create(S ,[Tab])          -> {create(tab_name(Tab)),S}.
+delete(S ,[Tab])          -> {delete_tab(S,tab_name(Tab)),S};
+delete(S ,[Tab,Key])      -> {deleter(S,tab(Tab),Key),S}.
+sizes(S  ,[])             -> {siz(),S}.
+keys(S   ,[Tab])          -> {key_getter(S,tab(Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(S,tab(Tab),KVs),S};
+insert(S ,[Tab,K,V])      -> {ins(S,tab(Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(S,tab(Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(S,tab(Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(S,tab(Tab),Key,I),S}.
+next(S   ,[Tab,Key])      -> {nextprev(S,next,tab(Tab),Key),S}.
+prev(S   ,[Tab,Key])      -> {nextprev(S,prev,tab(Tab),Key),S}.
+multi(S  ,[Tab,Key])      -> {getter(S,multi,tab(Tab),Key),S}.
+single(S ,[Tab,Key])      -> {getter(S,single,tab(Tab),Key),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(S,tab(TabI),tab(Tab),Key),S}.
 
 create(Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of
@@ -74,10 +103,14 @@ create(Tab) ->
     []            -> ets:insert(leveldb_tabs,{Tab,0}),true
   end.
 
-delete(Tab) ->
+delete_tab(S,Tab) ->
   case ets:lookup(leveldb_tabs,Tab) of
-    [{Tab,_Size}] -> ets:delete(leveldb_tabs,Tab),true;
-    []            -> false
+    [{Tab,_Size}] ->
+      [deleter(S,Tab,mk_ekey(Key)) || Key <- key_getter(S,Tab)],
+      ets:delete(leveldb_tabs,Tab),
+      true;
+    [] ->
+      false
   end.
 
 siz() ->
@@ -89,8 +122,12 @@ siz() ->
 key_getter(S,Tab) ->
   Fun = fun(TK,Acc) -> [tk_key(TK)|Acc] end,
   Iter = lvl_iter(S,keys_only),
-  R = fold_loop(lvl_mv_iter(Iter,Tab),Tab,Iter,Fun,[]),
-  lists:reverse(R).
+  try
+    R = fold_loop(lvl_mv_iter(Iter,Tab),Tab,Iter,Fun,[]),
+    lists:reverse(R)
+  after
+    lvl_close_iter(Iter)
+  end.
 
 fold_loop(invalid_iterator,_,_,_,Acc) ->
   Acc;
@@ -104,6 +141,13 @@ update_counter(S,Tab,Key,Incr) ->
   case lvl_get(S,tk(Tab,Key)) of
     not_found -> ins_overwrite(S,Tab,Key,Incr);
     Val       -> ins_overwrite(S,Tab,Key,Val+Incr)
+  end.
+
+update_counter(S,Tab,Key,Low,High) ->
+  case lvl_get(S,tk(Tab,Key)) of
+    not_found           -> ins_overwrite(S,Tab,Key,Low);
+    Val when Val < High -> ins_overwrite(S,Tab,Key,Val+1);
+    _                   -> ins_overwrite(S,Tab,Key,Low)
   end.
 
 reset_counter(S,Tab,Key,Val) ->
@@ -154,7 +198,7 @@ getter(S,multi,Tab,Ekey) ->
         As -> {As}
       end;
     Val ->
-      {[{list_to_binary(string:join(Ekey,"/")),Val}]}
+      {[{unmk_ekey(Ekey),Val}]}
   end.
 
 next(S,TK,WKey,Acc) ->
@@ -181,23 +225,39 @@ nextprev(S,OP,Tab,Key) ->
 
 nextprev(S,OP,TK) ->
   Iter = lvl_iter(S,key_vals),
-  check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK).
+  try
+    check_np(OP,lvl_mv_iter(Iter,TK),Iter,TK)
+  after
+    lvl_close_iter(Iter)
+  end.
 
 check_np(prev,invalid_iterator,Iter,TK) ->
-  case lvl_mv_iter(Iter,last) of
-    invalid_iterator -> throw({409,end_of_table});
-    {LastTK,Val} ->
-      case LastTK < TK of
-        true -> check_np(prev,{LastTK,Val},Iter,TK);
-        false-> check_np(next,invalid_iterator,Iter,TK)
-      end
-  end;
-check_np(_,invalid_iterator,_,_) ->
+  %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
+  %% case of TK being the last record, it will return an
+  %% invalid_iterator and we have to fix the situation here
+  check_np(prev,lvl_mv_iter(Iter,last),TK);
+check_np(prev,{TKNext,_},Iter,TK) when TKNext >= TK ->
+  %% lvl_mv_iter/2 moved the iterator to the first record not before
+  %% TK: we are interested in the previous record, so an additional
+  %% iterator step is necessary
+  check_np(prev,lvl_mv_iter(Iter,prev),TK);
+check_np(next,{TK,_},Iter,TK) ->
+  %% the requested key was in the table: an additional iterator step
+  %% is necessary
+  check_np(next,lvl_mv_iter(Iter,next),TK);
+check_np(next,TKV,_Iter,TK) ->
+  check_np(next,TKV,TK).
+
+check_np(_,invalid_iterator,_) ->
   end_of_table;
-check_np(OP,{TK,_},Iter,TK) ->
-  check_np(OP,lvl_mv_iter(Iter,OP),Iter,TK);
-check_np(_,{TK,V},_,_) ->
-  {TK,V}.
+check_np(OP,{TK2,V},TK1) when OP =:= next andalso TK2 > TK1;
+                              OP =:= prev andalso TK2 < TK1 ->
+  %% The tab of the two TK:s must match, otherwise we've reached the
+  %% end of this particular table
+  case tk_tab(TK1) =:= tk_tab(TK2) of
+    true  -> {TK2,V};
+    false -> end_of_table
+  end.
 
 deleter(S,Tab,Key) ->
   TK = tk(Tab,Key),
@@ -208,6 +268,39 @@ deleter(S,Tab,Key) ->
       lvl_delete(S,tk(Tab,Key)),
       ets:update_counter(leveldb_tabs,Tab,-1),
       Val
+  end.
+
+via(S,Tab1,Tab2,Key2) ->
+  %% Key2 in Tab2 holds the last visited key of Tab1. This operation
+  %% gets the next key and value from Tab1, updating the pointer under
+  %% Key2.
+  %%
+  %% It is important to pay attention to internal and external
+  %% representation of keys:
+  %% - Key2 does not need any transformation; it is already in the
+  %%   format gettert and setter functions expect it to be.
+  %% - Tab2 holds Key1 in external format (otherwise a simple get from
+  %%   Tab2 @ Key2 would crash)
+  %% - Key1 therefore needs to be converted to internal format before
+  %%   using it for a lookup in Tab1
+  %% - Once the next Key1 is found, it needs to be converted to
+  %%   external format before saving in Tab2
+  case lvl_get(S,tk(Tab2,Key2)) of
+    not_found -> via(S,Tab1,[],Tab2,Key2,false);
+    Key1      -> via(S,Tab1,mk_ekey(Key1),Tab2,Key2,true)
+  end.
+
+via(S,Tab1,Key1,Tab2,Key2,Retry) ->
+  case nextprev(S,next,tk(Tab1,Key1)) of
+    end_of_table when Retry ->
+      via(S,Tab1,[],Tab2,Key2,false);
+    end_of_table ->
+      throw({409,end_of_table});
+    {TK,V} ->
+      NextKey = tk_key(TK),
+      NextVal = unpack_val(V),
+      ins_overwrite(S,Tab2,Key2,NextKey),
+      {[{NextKey,NextVal}]}
   end.
 
 %% data packing
@@ -233,8 +326,11 @@ tab_unname(Tab) ->
 mk_ekey(Bin) ->
   string:tokens(binary_to_list(Bin),"/").
 
+unmk_ekey(EList) ->
+  list_to_binary(string:join(EList,"/")).
+
 tk(Tab,ElList) ->
-  Key = list_to_binary(string:join(ElList,"/")),
+  Key = unmk_ekey(ElList),
   <<Tab/binary,$/,Key/binary>>.
 
 tk_key(TK) ->
@@ -266,6 +362,9 @@ lvl_iter(S,What) ->
       key_vals  -> eleveldb:iterator(S#state.handle,[])
     end,
   Iter.
+
+lvl_close_iter(Iter) ->
+  eleveldb:iterator_close(Iter).
 
 lvl_mv_iter(Iter,Where) ->
   case eleveldb:iterator_move(Iter,Where) of

@@ -30,6 +30,7 @@ start_link(Args) ->
 init(Args) ->
   process_flag(trap_exit, true),
   do_init(Args).
+
 terminate(shutdown,State) ->
   do_terminate(State).
 
@@ -74,8 +75,10 @@ expand_recs(Term) ->
 -record(state,{
           %% Settable parameters
           %% Set from erl start command (erl -rets backend leveldb)
-          backend,  %% leveldb|ets
-          env,      %% result of application:get_all_env(rets)
+          backend   = leveldb, %% leveldb|ets
+          env       = [],      %% result of application:get_all_env(rets)
+          table_dir = "/tmp/rets/db",
+          keep_db   = false,
 
           %% Non-settable paramaters
           cb_mod,  %% rets BE callback module
@@ -85,15 +88,23 @@ expand_recs(Term) ->
 rec_info(state) -> record_info(fields,state).
 
 do_init(Args) ->
-  BE = proplists:get_value(backend,Args,leveldb),
+  S  = #state{},
+  BE = getv(backend,Args,S#state.backend),
+  KD = getv(keep_db,Args,S#state.keep_db),
+  TD = getv(table_dir,Args,S#state.table_dir),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
-  {ok,#state{backend  = BE,
-             env      = Args,
-             cb_mod   = CB,
-             cb_state = CB:init(Args)}}.
+  keep_or_delete_db(KD,TD),
+  {ok,S#state{
+        backend   = BE,
+        table_dir = TD,
+        keep_db   = KD,
+        env       = Args,
+        cb_mod    = CB,
+        cb_state  = CB:init([{keep_db,KD},{table_dir,TD}])}}.
 
-do_terminate(State) ->
-  (State#state.cb_mod):terminate(State#state.cb_state).
+do_terminate(S) ->
+  (S#state.cb_mod):terminate(S#state.cb_state,S#state.keep_db),
+  keep_or_delete_db(S#state.keep_db,S#state.table_dir).
 
 do_handle_call({F,Args},State) ->
   try
@@ -102,3 +113,31 @@ do_handle_call({F,Args},State) ->
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}
   end.
+
+keep_or_delete_db(true,_TableDir) -> ok;
+keep_or_delete_db(false,TableDir) -> delete_recursively(TableDir).
+
+-include_lib("kernel/include/file.hrl").
+-define(filetype(Type), #file_info{type=Type}).
+
+delete_recursively(File) ->
+  case file:read_file_info(File) of
+    {error,enoent} ->
+      ok;
+    {ok,?filetype(directory)} ->
+      {ok,Fs} = file:list_dir(File),
+      Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
+      lists:foreach(Del,Fs),
+      delete_file(del_dir,File);
+    {ok,?filetype(regular)} ->
+      delete_file(delete,File)
+  end.
+
+delete_file(Op,File) ->
+  case file:Op(File) of
+    ok -> ok;
+    {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
+  end.
+
+getv(K,PL,Def) ->
+  proplists:get_value(K,PL,Def).

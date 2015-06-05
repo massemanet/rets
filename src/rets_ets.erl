@@ -7,7 +7,7 @@
 -module('rets_ets').
 -author('Mats Cronqvist').
 -export([init/1,
-         terminate/1,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -18,28 +18,86 @@
          next/2,
          prev/2,
          multi/2,
-         single/2]).
+         single/2,
+         via/2
+        ]).
 
 -record(state, {tables=[],
-                props=[named_table,ordered_set,public]}).
+                start_tables = [],
+                props=[named_table,ordered_set,public],
+                dir,
+                idx
+               }).
 
-init(_Env)        -> #state{}.
-terminate(_State) -> ok.
+index_filename() -> "idx.term".
+
+init(Env) ->
+  Dir = proplists:get_value(table_dir,Env),
+  Idx = filename:join(Dir,index_filename()),
+  ok = filelib:ensure_dir(Idx),
+  load_db(#state{dir = Dir,idx = Idx}).
+
+load_db(State = #state{dir = Dir, idx = Idx}) ->
+  case file:consult(Idx) of
+    {ok, Ts} ->
+      Tables = lists:sort([load_table(Dir, T) || T <- Ts, is_atom(T)]),
+      State#state{tables = Tables,start_tables = Tables};
+    {error, _} ->
+      State
+  end.
+
+load_table(Dir,T) when is_atom(T) ->
+  Tab  = atom_to_list(T),
+  File = tab_file_name(Dir, Tab),
+  {ok, T} = ets:file2tab(File),
+  Tab.
+
+terminate(State, true) ->
+  save_db(State);
+terminate(_State, false) ->
+  ok.
+
+save_db(#state{tables       = Tabs,
+               start_tables = StartTabs,
+               dir          = Dir,
+               idx          = Idx}) ->
+  %% Save all ETS tables and the index
+  Ts = [save_table(Dir, Tab) || Tab <- Tabs],
+  ok = file:write_file(Idx, [io_lib:format("~p.~n", [T]) || T <- Ts]),
+
+  %% Delete those tabs that were saved the last time the backend was
+  %% stopped but no longer exists
+  [delete_tab(Dir,Tab) || Tab <- ordsets:subtract(StartTabs,Tabs)],
+  ok.
+
+delete_tab(Dir,Tab) ->
+  ok = file:delete(tab_file_name(Dir,Tab)).
+
+save_table(Dir, Tab) when is_list(Tab) ->
+  T = list_to_atom(Tab),
+  File = tab_file_name(Dir, Tab),
+  ok = ets:tab2file(T, File),
+  T.
+
+tab_file_name(Dir, Tab) when is_list(Tab) ->
+  filename:join(Dir, Tab ++ ".tab").
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])       -> creat(S,Tab).
-delete(S ,[Tab])       -> delet(S,Tab);
-delete(S ,[Tab,Key])   -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
-sizes(S  ,[])          -> {siz(S),S}.
-keys(S   ,[Tab])       -> {key_getter(tab(Tab)),S}.
-insert(S ,[Tab,KVs])   -> {ins(tab(Tab),[{key_e2i(i,K),V} || {K,V} <- KVs]),S};
-insert(S ,[Tab,K,V])   -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
-bump(S   ,[Tab,Key,I]) -> {update_counter(tab(Tab),key_e2i(i,Key),I),S}.
-reset(S  ,[Tab,Key,I]) -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
-next(S   ,[Tab,Key])   -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
-prev(S   ,[Tab,Key])   -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
-multi(S  ,[Tab,Key])   -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
-single(S ,[Tab,Key])   -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+create(S ,[Tab])          -> creat(S,Tab).
+delete(S ,[Tab])          -> delet(S,Tab);
+delete(S ,[Tab,Key])      -> {deleter(tab(Tab),key_e2i(i,Key)),S}.
+sizes(S  ,[])             -> {siz(S),S}.
+keys(S   ,[Tab])          -> {key_getter(tab(Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(tab(Tab),[{key_e2i(i,K),V}||{K,V}<-KVs]),S};
+insert(S ,[Tab,K,V])      -> {ins(tab(Tab),[{key_e2i(i,K),V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(tab(Tab),key_e2i(i,Key),I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(tab(Tab),key_e2i(i,Key),L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(tab(Tab),key_e2i(i,Key),I),S}.
+next(S   ,[Tab,Key])      -> {nextprev(next,tab(Tab),key_e2i(i,Key)),S}.
+prev(S   ,[Tab,Key])      -> {nextprev(prev,tab(Tab),key_e2i(i,Key)),S}.
+multi(S  ,[Tab,Key])      -> {getter(multi,tab(Tab),key_e2i(l,Key)),S}.
+single(S ,[Tab,Key])      -> {getter(single,tab(Tab),key_e2i(l,Key)),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(tab(TabI),tab(Tab),key_e2i(i,Key)),S}.
 
 creat(S,Tab) ->
   case lists:member(Tab,S#state.tables) of
@@ -102,9 +160,49 @@ update_counter(Tab,Key,Incr) ->
   catch _:_ -> reset_counter(Tab,Key,Incr)
   end.
 
+update_counter(Tab,Key,Low,High) ->
+  try ets:update_counter(Tab,Key,{2,1,High,Low})
+  catch _:_ -> reset_counter(Tab,Key,Low)
+  end.
+
 reset_counter(Tab,Key,Begin) ->
   ets:insert(Tab,{Key,Begin}),
   Begin.
+
+via(Tab1,Tab2,Key2) ->
+  %% Key2 in Tab2 holds the last visited key of Tab1. This operation
+  %% gets the next key and value from Tab1, updating the pointer under
+  %% Key2.
+  %%
+  %% It is important to pay attention to internal and external
+  %% representation of keys:
+  %% - Key2 is already in internal format
+  %% - Tab2 holds Key1 in external format (otherwise a simple get from
+  %%   Tab2 @ Key2 would crash)
+  %% - Key1 therefore needs to be converted to internal format before
+  %%   using it for a lookup in Tab1
+  %% - Once the next Key1 is found, it needs to be converted to
+  %%   external format before saving in Tab2
+  case ets:lookup(Tab2,Key2) of
+    [{Key2,EKey}] -> next_via(Tab1,key_e2i(EKey),Tab2,Key2);
+    []            -> first_via(Tab1,Tab2,Key2)
+  end.
+
+next_via(Tab1,Key1,Tab2,Key2) ->
+  case ets:lookup(Tab1,ets:next(Tab1,Key1)) of
+    [Rec] -> found_via(Tab2,Key2,Rec);
+    []    -> first_via(Tab1,Tab2,Key2)
+  end.
+
+first_via(Tab1,Tab2,Key2) ->
+  case ets:lookup(Tab1,ets:first(Tab1)) of
+    [Rec] -> found_via(Tab2,Key2,Rec);
+    []    -> throw({409,end_of_table})
+  end.
+
+found_via(Tab2,Key2,{Key1,V}) ->
+  ets:insert(Tab2,{Key2,key_i2e(Key1)}),
+  {[{key_i2e(Key1),V}]}.
 
 %% key handling
 %% the external form of a key is the path part of an url, basically
@@ -128,6 +226,10 @@ elem(_,E)   -> list_to_binary(E).
 %% transform key, internal to external.
 key_i2e(T) ->
   list_to_binary(join(tuple_to_list(T),<<"/">>)).
+
+%% the reverse of key_i2e/1
+key_e2i(T) ->
+  list_to_tuple(binary:split(T,<<"/">>,[global])).
 
 join([E],_) -> [E];
 join([E|R],D) -> [E,D|join(R,D)].
