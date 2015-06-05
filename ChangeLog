@@ -1,9 +1,156 @@
-commit b02b66698baa11baf80a6932223cba58b982ada4
+commit 0254902fc070091ad0146dad396150f2da476e4e
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Fri Jun 5 10:57:12 2015 +0200
+
+    v0.9.0
+
+src/rets.app.src
+
+commit 90a474a2dad9d3636c96a336f703128194fe6a45
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Fri Jun 5 10:56:13 2015 +0200
+
+    type specs are bad. they mess up dialyzer
+
+Makefile
+
+commit 086226a9ed100bccee8103e279873368ee77cdca
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jun 5 10:38:44 2015 +0200
+
+    touch up daniel's patches
+
+.gitignore
+Makefile
+bin/rets.sh
+rebar.config
+src/rets.erl
+src/rets_client.erl
+src/rets_ets.erl
+src/rets_handler.erl
+src/rets_leveldb.erl
+
+commit fc5f1003eadbaf66be175b5e33f211550d395735
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Fri May 8 14:14:38 2015 +0200
+
+    Allow keeping the ETS data on restart
+    This is to ensure the ETS and LevelDB backends support the same set of
+    features.
+    The semanthics of the `keep_db` option were changed a little bit from
+    the previous commit:
+    - The value is read (only once) when rets is started, not when it's
+      stopped.
+    - If rets is not supposed to keep the DB it deletes any previous DB
+      copy it finds on the disc at startup instead of using it.
+
+src/rets.app.src
+src/rets.erl
+src/rets_ets.erl
+src/rets_handler.erl
+src/rets_leveldb.erl
+
+commit 81f1b3287fa65bc5949e4c440a4651a54c79d1f7
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Mon Apr 27 11:46:26 2015 +0200
+
+    Allow keeping the LevelDB data on restart
+    The LevelDB backend stores some meta-data about the tables in ETS. To
+    persist this information before the backend is shut down the data is
+    added to the LevelDB table. Upon restart the information is restored
+    to ETS and the key is removed from LevelDB. This way the meta-data
+    will neither conflict with regular operations (because it is not in
+    LevelDB once the backend has started) nor we risk reading back an
+    outdated copy of it should the backend crash without a chance to
+    persist the updated ETS table.
+
+bin/rets.sh
+src/rets.app.src
+src/rets.erl
+src/rets_leveldb.erl
+
+commit 76d6319e37ed94142007f494e12797888d1a5009
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Fri May 8 14:26:25 2015 +0200
+
+    Close LevelDB iterators
+
+src/rets_leveldb.erl
+
+commit 479052a04054d8cf05732ef04c088c8c07ee4791
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Tue Apr 28 14:56:30 2015 +0200
+
+    Make sure the client can start lhttpc
+
+src/rets_client.erl
+
+commit c8c9145d0a39ac92f1d21b46cbdd99b2817f798c
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Tue Apr 21 17:14:43 2015 +0200
+
+    Add support for indirect table enumeration
+    An indirect enumeration is when the last accessed row of a table is
+    stored in a different table. The `rets` client may request the lookup
+    of the next row in the first table and the corresponding update of the
+    row pointer in the second in an atomic operation.
+    This method is used by spider to fetch e.g the next reserved payment
+    for an activate operation. Performing the read-next-store cycle in an
+    atomic step eliminates the risk of concurrently activating the same
+    payment in multiple transactions.
+
+src/rets.erl
+src/rets_client.erl
+src/rets_ets.erl
+src/rets_leveldb.erl
+
+commit 92e6b04dadc9b4075e86109e4e85328904faafcf
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Mon Apr 20 15:34:09 2015 +0200
+
+    Allow atomic counter updates with boundaries
+
+src/rets.erl
+src/rets_client.erl
+src/rets_ets.erl
+src/rets_leveldb.erl
+
+commit cd10edcc94a5a48b7a08f9380924506b1ad1bbe7
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Tue Apr 21 17:12:58 2015 +0200
+
+    Fix leveldb backend bugs
+    - Do respect table boundaries in get and next/prev operations.
+    - Erase records when deleting a table.
+
+src/rets.erl
+src/rets_leveldb.erl
+
+commit 87fd3cfaf240895fc1f129adab70f27ae862e782
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Tue Apr 21 16:59:33 2015 +0200
+
+    Stop the http server when terminating rets
+
+src/rets_app.erl
+
+commit fba9244690a08152f72ceb9032c2c847e548d25f
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Fri Apr 17 09:46:01 2015 +0200
+
+    Use lhttpc instead of httpc in rets_client
+
+rebar.config
+src/rets.app.src
+src/rets_client.erl
+
+commit 91e11ae8ca1248ba3734e28aaf9b9ef8745996cc
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Wed Apr 22 12:02:28 2015 +0200
 
     v0.8.5
 
+ChangeLog
 src/rets.app.src
 
 commit c60d36641418f69125fb770117d63a81fe5c8505
