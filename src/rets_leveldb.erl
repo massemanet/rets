@@ -50,11 +50,11 @@ init(Env) ->
   S.
 
 terminate(S) ->
-  fold_lvl(S,fun(T,_) -> delete_tab(T,S#state.keep_db) end).
+  fold_lvl(S,fun(Lvl,_) -> delete_tab(S,Lvl) end).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])          -> {create_tab(S,Tab)}.
-delete(S ,[Tab])          -> {delete_tab(S,get_lvl(S,Tab)),S};
+delete(S ,[Tab])          -> {delete_tab(S,catch get_lvl(S,Tab)),S};
 delete(S ,[Tab,Key])      -> {deleter(get_lvl(S,Tab),Key),S}.
 sizes(S  ,[])             -> {siz(S),S}.
 keys(S   ,[Tab])          -> {key_getter(get_lvl(S,Tab)),S}.
@@ -78,14 +78,14 @@ create_tab(S,Tab) ->
     #lvl{}    -> false
   end.
 
-delete_tab(S,Lvl) ->
-  case Lvl of
-    undefined -> false;
-    Lvl       -> get_rid_off(Lvl,S#state.keep_db),true
-  end.
+delete_tab(S,Lvl = #lvl{}) ->
+  get_rid_of(Lvl,S#state.keep_db),
+  true;
+delete_tab(_,_) ->
+  false.
 
-get_rid_off(Lvl,false) -> lvl_destroy(Lvl);
-get_rid_off(Lvl,true)  -> lvl_close(Lvl).
+get_rid_of(Lvl,false) -> lvl_destroy(Lvl);
+get_rid_of(Lvl,true)  -> lvl_close(Lvl).
 
 siz(S) ->
   fold_lvl(S,fun(Lvl,O) -> [{Lvl#lvl.name,undefined}|O] end).
@@ -277,7 +277,7 @@ put_lvl(S,Lvl) ->
 get_lvl(S,Tab) ->
   case ets:lookup(S#state.tabs,Tab) of
     [Lvl=#lvl{}]  -> Lvl;
-    undefined     -> throw({404,no_such_table})
+    []            -> throw({404,no_such_table})
   end.
 
 fold_lvl(S,Fun) ->

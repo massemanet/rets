@@ -7,7 +7,7 @@
 -module('rets_ets').
 -author('Mats Cronqvist').
 -export([init/1,
-         terminate/2,
+         terminate/1,
          create/2,
          delete/2,
          sizes/2,
@@ -25,6 +25,7 @@
 -record(state, {tables=[],
                 start_tables = [],
                 props=[named_table,ordered_set,public],
+                keep_db=false,
                 dir,
                 idx
                }).
@@ -33,9 +34,10 @@ index_filename() -> "idx.term".
 
 init(Env) ->
   Dir = proplists:get_value(table_dir,Env),
+  KeepDB = proplists:get_value(keep_db,Env),
   Idx = filename:join(Dir,index_filename()),
   ok = filelib:ensure_dir(Idx),
-  load_db(#state{dir = Dir,idx = Idx}).
+  load_db(#state{dir = Dir,idx = Idx,keep_db=KeepDB}).
 
 load_db(State = #state{dir = Dir, idx = Idx}) ->
   case file:consult(Idx) of
@@ -52,10 +54,11 @@ load_table(Dir,T) when is_atom(T) ->
   {ok, T} = ets:file2tab(File),
   Tab.
 
-terminate(State, true) ->
-  save_db(State);
-terminate(_State, false) ->
-  ok.
+terminate(State) ->
+  case State#state.keep_db of
+    true  -> save_db(State);
+    false -> ok
+  end.
 
 save_db(#state{tables       = Tabs,
                start_tables = StartTabs,
