@@ -28,9 +28,12 @@
          dir}).
 
 -record(lvl,
-        {table,
+        {name,
          file,
          handle}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% the API
 
 init(Env) ->
   BaseDir = proplists:get_value(table_dir,Env),
@@ -41,27 +44,33 @@ init(Env) ->
     false-> rets_file:delete_recursively(Dir)
   end,
   filelib:ensure_dir(filename:join(Dir,dummy)),
-  open_all(#state{dir = Dir,tabs = create_lvl(),keep_db = KeepDB}).
+  {ok,Files} = file:list_dir(Dir),
+  S = #state{dir = Dir,tabs = create_lvl(),keep_db = KeepDB},
+  lists:foreach(fun(F) -> put_lvl(S,lvl_open(Dir,F)) end,Files),
+  S.
 
 terminate(S) ->
   fold_lvl(S,fun(T,_) -> delete_tab(T,S#state.keep_db) end).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])          -> {create_tab(S,Tab)}.
-delete(S ,[Tab])          -> {delete_tab(S,tab(Tab),S};
-delete(S ,[Tab,Key])      -> {deleter(S,tab(S,Tab),Key),S}.
+delete(S ,[Tab])          -> {delete_tab(S,get_lvl(S,Tab)),S};
+delete(S ,[Tab,Key])      -> {deleter(get_lvl(S,Tab),Key),S}.
 sizes(S  ,[])             -> {siz(S),S}.
-keys(S   ,[Tab])          -> {key_getter(S,tab(S,Tab)),S}.
-insert(S ,[Tab,KVs])      -> {ins(S,tab(S,Tab),KVs),S};
-insert(S ,[Tab,K,V])      -> {ins(S,tab(S,Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I])    -> {update_counter(S,tab(S,Tab),Key,I),S};
-bump(S   ,[Tab,Key,L,H])  -> {update_counter(S,tab(S,Tab),Key,L,H),S}.
-reset(S  ,[Tab,Key,I])    -> {reset_counter(S,tab(S,Tab),Key,I),S}.
-next(S   ,[Tab,Key])      -> {nextprev(S,next,tab(S,Tab),Key),S}.
-prev(S   ,[Tab,Key])      -> {nextprev(S,prev,tab(S,Tab),Key),S}.
-multi(S  ,[Tab,Key])      -> {getter(S,multi,tab(S,Tab),Key),S}.
-single(S ,[Tab,Key])      -> {getter(S,single,tab(S,Tab),Key),S}.
-via(S    ,[Tab,Key,TabI]) -> {via(S,tab(S,TabI),tab(S,Tab),Key),S}.
+keys(S   ,[Tab])          -> {key_getter(get_lvl(S,Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(get_lvl(S,Tab),KVs),S};
+insert(S ,[Tab,K,V])      -> {ins(get_lvl(S,Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(get_lvl(S,Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(get_lvl(S,Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(get_lvl(S,Tab),Key,I),S}.
+next(S   ,[Tab,Key])      -> {next_prev(next,get_lvl(S,Tab),Key),S}.
+prev(S   ,[Tab,Key])      -> {next_prev(prev,get_lvl(S,Tab),Key),S}.
+multi(S  ,[Tab,Key])      -> {getter(get_lvl(S,Tab),multi,Key),S}.
+single(S ,[Tab,Key])      -> {getter(get_lvl(S,Tab),single,Key),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(get_lvl(S,TabI),get_lvl(S,Tab),Key),S}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% the implementetion
 
 create_tab(S,Tab) ->
   case get_lvl(S,Tab) of
@@ -69,8 +78,8 @@ create_tab(S,Tab) ->
     #lvl{}    -> false
   end.
 
-delete_tab(S,Tab) ->
-  case get_lvl(S,Tab) of
+delete_tab(S,Lvl) ->
+  case Lvl of
     undefined -> false;
     Lvl       -> get_rid_off(Lvl,S#state.keep_db),true
   end.
@@ -78,75 +87,70 @@ delete_tab(S,Tab) ->
 get_rid_off(Lvl,false) -> lvl_destroy(Lvl);
 get_rid_off(Lvl,true)  -> lvl_close(Lvl).
 
-open_all(S) ->
-  Dir = S#state.dir,
-  {ok,Files} = file:list_dir(Dir),
-  lists:foreach(fun(F) -> put_lvl(S,lvl_open(Dir,F)) end,Files).
-
 siz(S) ->
-  fold_lvl(S,fun(Lvl,O) -> [{Lvl#lvl.table,undefined}|O] end).
+  fold_lvl(S,fun(Lvl,O) -> [{Lvl#lvl.name,undefined}|O] end).
 
-key_getter(S,Tab) ->
-  Iter = lvl_iter(S,keys_only),
+key_getter(Lvl) ->
+  Iter = lvl_iter(Lvl,keys_only),
   try
-    lists:reverse(fold_loop(lvl_mv_iter(Iter,Tab),Tab,Iter,[]))
+    lists:reverse(key_getter_loop(lvl_mv_iter(Iter,first),Iter,[]))
   after
     lvl_close_iter(Iter)
   end.
 
-fold_loop(invalid_iterator,_,_,Acc) ->
+key_getter_loop(invalid_iterator,_,Acc) ->
   Acc;
-fold_loop(K,Tab,Iter,Acc) ->
-  fold_loop(lvl_mv_iter(Iter,prefetch),Tab,Iter,[K|Acc]).
+key_getter_loop(K,Iter,Acc) ->
+  key_getter_loop(lvl_mv_iter(Iter,prefetch),Iter,[K|Acc]).
 
-update_counter(S,Tab,Key,Incr) ->
-  case lvl_get(S,Tab,Key) of
-    not_found -> ins_overwrite(S,Tab,Key,Incr);
-    Val       -> ins_overwrite(S,Tab,Key,Val+Incr)
+update_counter(Lvl,Key,Incr) ->
+  case lvl_get(Lvl,Key) of
+    not_found -> ins_overwrite(Lvl,Key,Incr);
+    Val       -> ins_overwrite(Lvl,Key,Val+Incr)
   end.
 
-update_counter(S,Tab,Key,Low,High) ->
-  case lvl_get(S,Tab,Key) of
-    not_found           -> ins_overwrite(S,Tab,Key,Low);
-    Val when Val < High -> ins_overwrite(S,Tab,Key,Val+1);
-    _                   -> ins_overwrite(S,Tab,Key,Low)
+update_counter(Lvl,Key,Low,High) ->
+  case lvl_get(Lvl,Key) of
+    not_found           -> ins_overwrite(Lvl,Key,Low);
+    Val when Val < High -> ins_overwrite(Lvl,Key,Val+1);
+    _                   -> ins_overwrite(Lvl,Key,Low)
   end.
 
-reset_counter(S,Tab,Key,Val) ->
-  ins_overwrite(S,Tab,Key,Val).
+reset_counter(Lvl,Key,Val) ->
+  ins_overwrite(Lvl,Key,Val).
 
-ins(S,Tab,KVs) ->
-  lists:foreach(fun({Key,Val}) -> ins_ifempty(S,Tab,Key,Val) end,KVs),
+ins(Lvl,KVs) ->
+  lists:foreach(fun({Key,Val}) -> ins_ifempty(Lvl,Key,Val) end,KVs),
   true.
 
 %%            key exists  doesn't exist
 %% ifempty       N           W
 %% overwrite     W           W
 
-ins_ifempty(S,Tab,Key,Val) ->
-  case lvl_get(S,Tab,Key) of
-    not_found -> do_ins(S,Tab,Key,Val);
-    Vl        -> throw({409,{key_exists,{Tab,Key,Vl}}})
+ins_ifempty(Lvl,Key,Val) ->
+  case lvl_get(Lvl,Key) of
+    not_found -> do_ins(Lvl,Key,Val);
+    Vl        -> throw({409,{key_exists,{Lvl#lvl.name,Key,Vl}}})
   end.
 
-ins_overwrite(S,Tab,Key,Val) ->
-  do_ins(S,Tab,Key,Val).
+ins_overwrite(Lvl,Key,Val) ->
+  do_ins(Lvl,Key,Val).
 
-do_ins(S,Tab,Key,Val) ->
-  lvl_put(S,Tab,Key,pack_val(Val)),
+do_ins(Lvl,Key,Val) ->
+  lvl_put(Lvl,Key,pack_val(Val)),
   Val.
 
 %% get data from leveldb.
 %% allow wildcards (".") in keys
-getter(S,single,Tab,Ekey) ->
-  case getter(S,multi,Tab,Ekey) of
+getter(Lvl,single,Ekey) ->
+  case getter(Lvl,multi,Ekey) of
     {[{_,V}]} -> V;
     _         -> throw({404,multiple_hits})
   end;
-getter(S,multi,Tab,Ekey) ->
-  case lvl_get(S,Tab,Ekey) of
+getter(Lvl,multi,Ekey) ->
+  case lvl_get(Lvl,Ekey) of
     not_found ->
-      case next(S,Tab,Ekey,Ekey,[]) of
+      case next(Lvl,Ekey,Ekey,[]) of
         [] -> throw({404,no_such_key});
         As -> {As}
       end;
@@ -154,12 +158,12 @@ getter(S,multi,Tab,Ekey) ->
       {[{unmk_ekey(Ekey),Val}]}
   end.
 
-next(S,Tab,Key,WKey,Acc) ->
-  case nextprev(S,next,Tab,Key) of
+next(Lvl,Key,WKey,Acc) ->
+  case next_prev(Lvl,next,Key) of
     end_of_table -> lists:reverse(Acc);
     {Key,V} ->
       case key_match(WKey,mk_ekey(Key)) of
-        true -> next(S,Tab,Key,WKey,[{Key,unpack_val(V)}|Acc]);
+        true -> next(Lvl,Key,WKey,[{Key,unpack_val(V)}|Acc]);
         false-> Acc
       end
   end.
@@ -169,59 +173,54 @@ key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
 key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
 key_match(_,_)                 -> false.
 
-nextprev(S,OP,Tab,Key) ->
-  case nextprev(S,OP,{Tab,Key}) of
+next_prev(Lvl,OP,Key) ->
+  case nextprev(Lvl,OP,Key) of
     end_of_table -> throw({409,end_of_table});
     {NewKey,V}   -> {[{NewKey,unpack_val(V)}]}
   end.
 
-nextprev(S,OP,{Tab,Key}) ->
-  Iter = lvl_iter(S,key_vals),
+nextprev(Lvl,OP,Key) ->
+  Iter = lvl_iter(Lvl,key_vals),
   try
-    check_np(OP,lvl_mv_iter(Iter,Tab,Key),Iter,TK)
+    check_np(OP,lvl_mv_iter(Iter,Key),Iter,Key)
   after
     lvl_close_iter(Iter)
   end.
 
-check_np(prev,invalid_iterator,Iter,TK) ->
+check_np(prev,invalid_iterator,Iter,Key) ->
   %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
   %% case of TK being the last record, it will return an
   %% invalid_iterator and we have to fix the situation here
-  check_np(prev,lvl_mv_iter(Iter,last),TK);
-check_np(prev,{TKNext,_},Iter,TK) when TKNext >= TK ->
+  check_np(prev,lvl_mv_iter(Iter,last),Key);
+check_np(prev,{KeyNext,_},Iter,Key) when KeyNext >= Key ->
   %% lvl_mv_iter/2 moved the iterator to the first record not before
   %% TK: we are interested in the previous record, so an additional
   %% iterator step is necessary
-  check_np(prev,lvl_mv_iter(Iter,prev),TK);
-check_np(next,{TK,_},Iter,TK) ->
+  check_np(prev,lvl_mv_iter(Iter,prev),Key);
+check_np(next,{Key,_},Iter,Key) ->
   %% the requested key was in the table: an additional iterator step
   %% is necessary
-  check_np(next,lvl_mv_iter(Iter,next),TK);
-check_np(next,TKV,_Iter,TK) ->
-  check_np(next,TKV,TK).
+  check_np(next,lvl_mv_iter(Iter,next),Key);
+check_np(next,KV,_Iter,Key) ->
+  check_np(next,KV,Key).
 
 check_np(_,invalid_iterator,_) ->
   end_of_table;
-check_np(OP,{TK2,V},TK1) when OP =:= next andalso TK2 > TK1;
-                              OP =:= prev andalso TK2 < TK1 ->
-  %% The tab of the two TK:s must match, otherwise we've reached the
-  %% end of this particular table
-  case tk_tab(TK1) =:= tk_tab(TK2) of
-    true  -> {TK2,V};
-    false -> end_of_table
-  end.
+check_np(OP,{K2,V},K1) when OP =:= next andalso K1 < K2;
+                            OP =:= prev andalso K2 < K1 ->
+  {K2,V}.
 
-deleter(S,Tab,Key) ->
-  TK = tk(Tab,Key),
-  case lvl_get(S,TK) of
+
+deleter(Lvl,Key) ->
+  case lvl_get(Lvl,Key) of
     not_found ->
       null;
     Val ->
-      lvl_delete(S,tk(Tab,Key)),
+      lvl_delete(Lvl,Key),
       Val
   end.
 
-via(S,Tab1,Tab2,Key2) ->
+via(Lvl1,Lvl2,Key2) ->
   %% Key2 in Tab2 holds the last visited key of Tab1. This operation
   %% gets the next key and value from Tab1, updating the pointer under
   %% Key2.
@@ -236,21 +235,20 @@ via(S,Tab1,Tab2,Key2) ->
   %%   using it for a lookup in Tab1
   %% - Once the next Key1 is found, it needs to be converted to
   %%   external format before saving in Tab2
-  case lvl_get(S,tk(Tab2,Key2)) of
-    not_found -> via(S,Tab1,[],Tab2,Key2,false);
-    Key1      -> via(S,Tab1,mk_ekey(Key1),Tab2,Key2,true)
+  case lvl_get(Lvl2,Key2) of
+    not_found -> via(Lvl1,[],Lvl2,Key2,false);
+    Key1      -> via(Lvl1,mk_ekey(Key1),Lvl2,Key2,true)
   end.
 
-via(S,Tab1,Key1,Tab2,Key2,Retry) ->
-  case nextprev(S,next,tk(Tab1,Key1)) of
+via(Lvl1,Key1,Lvl2,Key2,Retry) ->
+  case nextprev(Lvl1,next,Key1) of
     end_of_table when Retry ->
-      via(S,Tab1,[],Tab2,Key2,false);
+      via(Lvl1,[],Lvl2,Key2,false);
     end_of_table ->
       throw({409,end_of_table});
-    {TK,V} ->
-      NextKey = tk_key(TK),
+    {NextKey,V} ->
       NextVal = unpack_val(V),
-      ins_overwrite(S,Tab2,Key2,NextKey),
+      ins_overwrite(Lvl2,Key2,NextKey),
       {[{NextKey,NextVal}]}
   end.
 
@@ -259,13 +257,6 @@ pack_val(Val) ->
   term_to_binary(Val).
 unpack_val(Val) ->
   binary_to_term(Val).
-
-%% table names
-tab(S,Tab) ->
-  case get_lvl(S,Tab) of
-    #lvl{}    -> Tab;
-    undefined -> throw({404,no_such_table})
-  end.
 
 %% key mangling
 mk_ekey(Bin) ->
@@ -284,7 +275,10 @@ put_lvl(S,Lvl) ->
   ets:insert(S#state.tabs,Lvl).
 
 get_lvl(S,Tab) ->
-  ets:lookup(S#state.tabs,Tab).
+  case ets:lookup(S#state.tabs,Tab) of
+    [Lvl=#lvl{}]  -> Lvl;
+    undefined     -> throw({404,no_such_table})
+  end.
 
 fold_lvl(S,Fun) ->
   ets:foldl(Fun,[],S#state.tabs).
@@ -295,7 +289,7 @@ fold_lvl(S,Fun) ->
 lvl_open(Dir,Tab) ->
   File = filename:join(Dir,Tab),
   case eleveldb:open(File,[{create_if_missing,true}]) of
-    {ok,Handle} -> #lvl{table = Tab,handle = Handle,file = File};
+    {ok,Handle} -> #lvl{name = Tab,handle = Handle,file = File};
     {error,Err} -> throw({500,{open_error,Err}})
   end.
 
