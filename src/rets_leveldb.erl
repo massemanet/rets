@@ -189,7 +189,7 @@ key_match(_,_)                 -> false.
 next_prev(Lvl,OP,Key) ->
   case nextprev(Lvl,OP,Key) of
     end_of_table -> throw({409,end_of_table});
-    {NewKey,V}   -> {[{NewKey,V}]}
+    {NewKey,V}   -> {[{pack_key(NewKey),V}]}
   end.
 
 nextprev(Lvl,OP,Key) ->
@@ -246,7 +246,7 @@ via(Lvl1,Lvl2,Key2) ->
   %%   external format before saving in Tab2
   case lvl_get(Lvl2,Key2) of
     not_found -> via(Lvl1,[],Lvl2,Key2,false);
-    Key1      -> via(Lvl1,Key1,Lvl2,Key2,true)
+    Key1      -> via(Lvl1,unpack_key(Key1),Lvl2,Key2,true)
   end.
 
 via(Lvl1,Key1,Lvl2,Key2,Retry) ->
@@ -255,9 +255,9 @@ via(Lvl1,Key1,Lvl2,Key2,Retry) ->
       via(Lvl1,[],Lvl2,Key2,false);
     end_of_table ->
       throw({409,end_of_table});
-    {NextKey,NextVal} ->
-      ins_overwrite(Lvl2,Key2,NextKey),
-      {[{NextKey,NextVal}]}
+    {NextKey1,NextVal1} ->
+      ins_overwrite(Lvl2,Key2,pack_key(NextKey1)),
+      {[{pack_key(NextKey1),NextVal1}]}
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

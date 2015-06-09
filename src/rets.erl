@@ -178,17 +178,45 @@ je(Term) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-null_ets_test() -> null_test(ets).
-null_leveldb_test() -> null_test(leveldb).
-null_test(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual(Backend,
-               proplists:get_value(backend,rets:state())).
+%% ets_dont_keep_test_() ->
+%%   SETUP =
+%%     fun() ->
+%%         application:set_env(rets,keep_db,false),
+%%         restart_rets(ets)
+%%     end,
+%%  tests(SETUP).
 
-t00_ets_test()     -> t00(ets).
-t00_leveldb_test() -> t00(leveldb).
-t00(Backend) ->
-  restart_rets(Backend),
+leveldb_dont_keep_test_() ->
+  SETUP =
+    fun() ->
+        application:set_env(rets,keep_db,false),
+        restart_rets(leveldb)
+    end,
+  [fun() -> t00(SETUP) end,
+   fun() -> t01(SETUP) end,
+   fun() -> t02(SETUP) end,
+   fun() -> t03(SETUP) end,
+   fun() -> t04(SETUP) end,
+   fun() -> t05(SETUP) end,
+   fun() -> t06(SETUP) end,
+   fun() -> t07(SETUP) end,
+   fun() -> t08(SETUP) end,
+   fun() -> t09(SETUP) end,
+   fun() -> t10(SETUP) end,
+   fun() -> t11(SETUP) end,
+   fun() -> t12(SETUP) end,
+   fun() -> t13(SETUP) end
+  ].
+
+keep_db_test_() ->
+  [fun() -> t14(leveldb) end,
+   fun() -> t14(ets) end].
+
+keep_ets_test_() ->
+  [fun() -> t15() end].
+
+t00(SETUP) ->
+  SETUP(),
   ?assertEqual({200,false},
                rets_client:delete(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -224,10 +252,8 @@ t00(Backend) ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,"ddd")).
 
-t01_ets_test()     -> t01(ets).
-t01_leveldb_test() -> t01(leveldb).
-t01(Backend) ->
-  restart_rets(Backend),
+t01(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -251,10 +277,8 @@ t01(Backend) ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,ddd)).
 
-t02_ets_test()     -> t02(ets).
-t02_leveldb_test() -> t02(leveldb).
-t02(Backend) ->
-  restart_rets(Backend),
+t02(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -266,10 +290,8 @@ t02(Backend) ->
   ?assertEqual({200,[{"a","A"},{"b","b"},{"c",123.3}]},
                rets_client:get(localhost,tibbe,ddd)).
 
-t03_ets_test()     -> t03(ets).
-t03_leveldb_test() -> t03(leveldb).
-t03(Backend) ->
-  restart_rets(Backend),
+t03(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,1},
@@ -283,31 +305,8 @@ t03(Backend) ->
   ?assertEqual({200,1},
                rets_client:put(localhost,tibbe,bbb,counter)).
 
-t031_ets_test()     -> t031(ets).
-t031_leveldb_test() -> t031(leveldb).
-t031(Backend) ->
-  restart_rets(Backend),
-  ?assertEqual({200,true},
-               rets_client:put(localhost,tibbe)),
-  ?assertEqual({200,2},
-               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
-  ?assertEqual({200,3},
-               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
-  ?assertEqual({200,3},
-               rets_client:get(localhost,tibbe,bbb)),
-  ?assertEqual({200,2},
-               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
-  ?assertEqual({200,3},
-               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
-  ?assertEqual({200,0},
-               rets_client:put(localhost,tibbe,bbb,reset)),
-  ?assertEqual({200,1},
-               rets_client:put(localhost,tibbe,bbb,{counter,1,1})).
-
-t04_ets_test()     -> t04(ets).
-t04_leveldb_test() -> t04(leveldb).
-t04(Backend) ->
-  restart_rets(Backend),
+t04(SETUP) ->
+  SETUP(),
   ?assertEqual({200,[]},
                rets_client:get(localhost)),
   ?assertEqual({200,true},
@@ -329,10 +328,8 @@ t04(Backend) ->
   ?assertEqual({200,[{tabbe,0},{tibbe,0}]},
                rets_client:get(localhost)).
 
-t05_ets_test()     -> t05(ets).
-t05_leveldb_test() -> t05(leveldb).
-t05(Backend) ->
-  restart_rets(Backend),
+t05(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -342,10 +339,8 @@ t05(Backend) ->
   ?assertMatch({409,_},
                rets_client:put(localhost,tibbe,foo,a)).
 
-t06_ets_test()     -> t06(ets).
-t06_leveldb_test() -> t06(leveldb).
-t06(Backend) ->
-  restart_rets(Backend),
+t06(SETUP) ->
+  SETUP(),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -365,10 +360,8 @@ t06(Backend) ->
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)).
 
-t07_ets_test()     -> t07(ets).
-t07_leveldb_test() -> t07(leveldb).
-t07(Backend) ->
-  restart_rets(Backend),
+t07(SETUP) ->
+  SETUP(),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -398,10 +391,8 @@ t07(Backend) ->
   ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,'b/./.',multi)).
 
-t08_ets_test()     -> t08(ets).
-t08_leveldb_test() -> t08(leveldb).
-t08(Backend) ->
-  restart_rets(Backend),
+t08(SETUP) ->
+  SETUP(),
   T = [{"a","a"},{"b",[{"bb","bb"}]}], %% nested proplist
   ?assertEqual({200,true},
                rets_client:put(localhost,tybbe)),
@@ -410,10 +401,8 @@ t08(Backend) ->
   ?assertMatch({200,T},
                rets_client:get(localhost,tybbe,"abc")).
 
-t09_ets_test()     -> t09(ets).
-t09_leveldb_test() -> t09(leveldb).
-t09(Backend) ->
-  restart_rets(Backend),
+t09(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
   ?assertEqual({409,"end_of_table"},
@@ -433,13 +422,11 @@ t09(Backend) ->
   ?assertEqual({200,[{"a",1}]},
                rets_client:get(localhost,tebbe,0,next)).
 
-t10_ets_test()     -> t10(ets).
-t10_leveldb_test() -> t10(leveldb).
-t10(Backend) ->
+t10(SETUP) ->
+  SETUP(),
   %% This test verifies that if we have multiple tables performing a
   %% next on the first table's last element won't return the second
   %% table's first element.
-  restart_rets(Backend),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
   ?assertEqual({200,true},
@@ -497,10 +484,8 @@ t10(Backend) ->
   ?assertEqual({409,"end_of_table"},
                rets_client:get(localhost,tibbe,"c",prev)).
 
-t11_ets_test()     -> t11(ets).
-t11_leveldb_test() -> t11(leveldb).
-t11(Backend) ->
-  restart_rets(Backend),
+t11(SETUP) ->
+  SETUP(),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
   ?assertEqual({200,true},
@@ -524,24 +509,35 @@ t11(Backend) ->
   ?assertEqual({200,"a/b/c"},
                rets_client:get(localhost,tibbe,a)).
 
-t12_ets_test_()     -> t12_(ets).
-t12_leveldb_test_() -> t12_(leveldb).
-t12_(Backend) ->
-  {setup,
-   %% SETUP
-   fun () ->
-       application:set_env(rets, keep_db, true),
-       restart_rets(Backend)
-   end,
-   %% CLEANUP
-   fun (_) ->
-       application:set_env(rets, keep_db, false),
-       restart_rets(Backend)
-   end,
-   [{atom_to_list(Backend), fun () -> t12(Backend) end}
-   ]}.
-t12(Backend) ->
-  %% Initially the DB is empty
+t12(SETUP) ->
+  SETUP(),
+  ?assertEqual({200,true},
+               rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:get(localhost,tibbe,bbb)),
+  ?assertEqual({200,2},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,3},
+               rets_client:put(localhost,tibbe,bbb,{counter,2,3})),
+  ?assertEqual({200,0},
+               rets_client:put(localhost,tibbe,bbb,reset)),
+  ?assertEqual({200,1},
+               rets_client:put(localhost,tibbe,bbb,{counter,1,1})).
+
+t13(SETUP) ->
+  SETUP(),
+  ?assertMatch(A when A==ets;A==leveldb,
+               proplists:get_value(backend,rets:state())).
+
+t14(Backend) ->
+  application:set_env(rets, keep_db, false),
+  restart_rets(Backend),
+
+  %% Here the DB is empty
   ?assertEqual({200,[]},
                rets_client:get(localhost)),
 
@@ -556,6 +552,7 @@ t12(Backend) ->
                rets_client:get(localhost,tebbe,a)),
 
   %% Restart rets when keep_db is set
+  application:set_env(rets, keep_db, true),
   restart_rets(Backend),
 
   %% Verify the data stayed
@@ -572,21 +569,10 @@ t12(Backend) ->
   ?assertEqual({200,[]},
                rets_client:get(localhost)).
 
-t13_ets_test_() ->
-  {setup,
-   %% SETUP
-   fun () ->
-       application:set_env(rets, keep_db, true),
-       restart_rets(ets)
-   end,
-   %% CLEANUP
-   fun (_) ->
-       application:set_env(rets, keep_db, false),
-       restart_rets(ets)
-   end,
-   [fun t13/0
-   ]}.
-t13() ->
+t15() ->
+  application:set_env(rets, keep_db, true),
+  restart_rets(ets),
+
   %% Create two tables
   ?assertEqual({200, true},
                rets_client:put(localhost,tebbe)),
