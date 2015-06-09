@@ -6,8 +6,8 @@
 
 -module('rets_leveldb').
 -author('Mats Cronqvist').
--export([init/1,
-         terminate/1,
+-export([init/2,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -23,9 +23,9 @@
         ]).
 
 -record(state,
-        {tabs,
-         keep_db,
-         dir}).
+        {lvl_table,    %% an ets table with #lvl{} records
+         dir           %% the table directory
+        }).
 
 -record(lvl,
         {name,
@@ -35,26 +35,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% the API
 
-init(Env) ->
-  BaseDir = proplists:get_value(table_dir,Env),
-  KeepDB = proplists:get_value(keep_db,Env),
-  Dir  = filename:join(BaseDir,leveldb),
-  case KeepDB of
-    true -> ok;
-    false-> rets_file:delete_recursively(Dir)
-  end,
-  filelib:ensure_dir(filename:join(Dir,dummy)),
-  {ok,Files} = file:list_dir(Dir),
-  S = #state{dir = Dir,tabs = create_lvl(),keep_db = KeepDB},
+init(Dir,Files) ->
+  S = #state{lvl_table = create_lvl()},
   lists:foreach(fun(F) -> put_lvl(S,lvl_open(Dir,F)) end,Files),
-  S.
+  S#state{dir = Dir}.
 
-terminate(S) ->
-  fold_lvl(S,fun(Lvl,_) -> delete_tab(S,Lvl) end).
+terminate(KeepDB,S) ->
+  fold_lvl(S,fun(Lvl,_) -> delete_tab(S,Lvl,KeepDB) end).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])          -> {create_tab(S,Tab),S}.
-delete(S ,[Tab])          -> {delete_tab(S,Tab),S};
+delete(S ,[Tab])          -> {delete_tab(S,Tab,false),S};
 delete(S ,[Tab,Key])      -> {deleter(assert_lvl(S,Tab),Key),S}.
 sizes(S  ,[])             -> {siz(S),S}.
 keys(S   ,[Tab])          -> {key_getter(assert_lvl(S,Tab)),S}.
@@ -84,18 +75,18 @@ create_tab(S,Tab) ->
     #lvl{}    -> false
   end.
 
-delete_tab(S,Tab) ->
+delete_tab(S,Tab,KeepDB) ->
   case get_lvl(S,Tab) of
     undefined ->
       false;
     Lvl ->
-      get_rid_of(Lvl,S#state.keep_db),
+      get_rid_of(KeepDB,Lvl),
       delete_lvl(S,Lvl),
       true
   end.
 
-get_rid_of(Lvl,false) -> lvl_destroy(Lvl);
-get_rid_of(Lvl,true)  -> lvl_close(Lvl).
+get_rid_of(false,Lvl) -> lvl_destroy(Lvl);
+get_rid_of(true,Lvl)  -> lvl_close(Lvl).
 
 siz(S) ->
   case fold_lvl(S,fun(Lvl,O) -> [{tab_name(Lvl),tab_size(Lvl)}|O] end) of
@@ -267,19 +258,19 @@ create_lvl() ->
   ets:new(rets_leveldb_tabs,[named_table,ordered_set,{keypos,2}]).
 
 delete_lvl(S,Lvl) ->
-  ets:delete(S#state.tabs,Lvl#lvl.name).
+  ets:delete(S#state.lvl_table,Lvl#lvl.name).
 
 put_lvl(S,Lvl) ->
-  ets:insert(S#state.tabs,Lvl).
+  ets:insert(S#state.lvl_table,Lvl).
 
 get_lvl(S,Tab) ->
-  case ets:lookup(S#state.tabs,Tab) of
+  case ets:lookup(S#state.lvl_table,Tab) of
     [Lvl=#lvl{}]  -> Lvl;
     []            -> undefined
   end.
 
 fold_lvl(S,Fun) ->
-  ets:foldr(Fun,[],S#state.tabs).
+  ets:foldr(Fun,[],S#state.lvl_table).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% leveldb API

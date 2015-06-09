@@ -91,18 +91,28 @@ do_init(Args) ->
   S  = #state{},
   BE = getv(backend,Args,S#state.backend),
   KD = getv(keep_db,Args,S#state.keep_db),
-  TD = getv(table_dir,Args,S#state.table_dir),
+  BD = getv(table_dir,Args,S#state.table_dir),
+  TD = filename:join(BD,BE),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
+  filelib:ensure_dir(filename:join(TD,dummy)),
   {ok,S#state{
         backend   = BE,
         table_dir = TD,
         keep_db   = KD,
         env       = Args,
         cb_mod    = CB,
-        cb_state  = CB:init([{keep_db,KD},{table_dir,TD}])}}.
+        cb_state  = CB:init(TD,files(KD,TD))}}.
+
+files(false,TableDir) ->
+  rets_file:delete_recursively(TableDir),
+  filelib:ensure_dir(filename:join(TableDir,dummy)),
+  [];
+files(true,TableDir) ->
+  {ok,Files} = file:list_dir(TableDir),
+  Files.
 
 do_terminate(S) ->
-  (S#state.cb_mod):terminate(S#state.cb_state).
+  (S#state.cb_mod):terminate(S#state.keep_db,S#state.cb_state).
 
 do_handle_call({F,Args},State) ->
   try

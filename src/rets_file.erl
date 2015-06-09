@@ -5,10 +5,21 @@
 %% @end
 
 -module('rets_file').
--export([delete_recursively/1]).
+-export([delete_recursively/1,
+         delete_flat/1]).
 
 -include_lib("kernel/include/file.hrl").
 -define(filetype(Type), #file_info{type=Type}).
+
+delete_flat(File) ->
+  case file:read_file_info(File) of
+    {ok,?filetype(directory)} ->
+      {ok,Fs} = file:list_dir(File),
+      Del = fun(F) -> delete_file(delete,filename:join(File,F)) end,
+      lists:foreach(Del,Fs);
+    _ ->
+      ok
+  end.
 
 delete_recursively(File) ->
   case file:read_file_info(File) of

@@ -6,8 +6,8 @@
 
 -module('rets_ets').
 -author('Mats Cronqvist').
--export([init/1,
-         terminate/1,
+-export([init/2,
+         terminate/2,
          create/2,
          delete/2,
          sizes/2,
@@ -23,67 +23,33 @@
         ]).
 
 -record(state, {tables=[],
-                start_tables = [],
                 props=[named_table,ordered_set,public],
-                keep_db=false,
-                dir,
-                idx
+                dir
                }).
 
-index_filename() -> "idx.term".
+init(Dir,Files) ->
+  Tables = lists:sort([load_table(Dir,F) || F <- Files]),
+  #state{dir = Dir,tables = Tables}.
 
-init(Env) ->
-  Dir = proplists:get_value(table_dir,Env),
-  KeepDB = proplists:get_value(keep_db,Env),
-  Idx = filename:join(Dir,index_filename()),
-  ok = filelib:ensure_dir(Idx),
-  load_db(#state{dir = Dir,idx = Idx,keep_db=KeepDB}).
-
-load_db(State = #state{dir = Dir, idx = Idx}) ->
-  case file:consult(Idx) of
-    {ok, Ts} ->
-      Tables = lists:sort([load_table(Dir, T) || T <- Ts, is_atom(T)]),
-      State#state{tables = Tables,start_tables = Tables};
-    {error, _} ->
-      State
-  end.
-
-load_table(Dir,T) when is_atom(T) ->
-  Tab  = atom_to_list(T),
-  File = tab_file_name(Dir, Tab),
-  {ok, T} = ets:file2tab(File),
+load_table(Dir,F) ->
+  File = filename:join(Dir,F),
+  {ok,Tab} = ets:file2tab(File),
   Tab.
 
-terminate(State) ->
-  case State#state.keep_db of
-    true  -> save_db(State);
-    false -> ok
-  end.
+terminate(KeepDB,State) ->
+  %% delete all old save files
+  rets_file:delete_flat(State#state.dir),
+  maybe_save_db(KeepDB,State).
 
-save_db(#state{tables       = Tabs,
-               start_tables = StartTabs,
-               dir          = Dir,
-               idx          = Idx}) ->
+maybe_save_db(false,_) -> [];
+maybe_save_db(true,S) ->
   %% Save all ETS tables and the index
-  Ts = [save_table(Dir, Tab) || Tab <- Tabs],
-  ok = file:write_file(Idx, [io_lib:format("~p.~n", [T]) || T <- Ts]),
+  [save_table(S#state.dir,Tab) || Tab <- S#state.tables].
 
-  %% Delete those tabs that were saved the last time the backend was
-  %% stopped but no longer exists
-  [delete_tab(Dir,Tab) || Tab <- ordsets:subtract(StartTabs,Tabs)],
-  ok.
-
-delete_tab(Dir,Tab) ->
-  ok = file:delete(tab_file_name(Dir,Tab)).
-
-save_table(Dir, Tab) when is_list(Tab) ->
-  T = list_to_atom(Tab),
-  File = tab_file_name(Dir, Tab),
-  ok = ets:tab2file(T, File),
-  T.
-
-tab_file_name(Dir, Tab) when is_list(Tab) ->
-  filename:join(Dir, Tab ++ ".tab").
+save_table(Dir,Tab) ->
+  File = filename:join(Dir, Tab),
+  ok = ets:tab2file(Tab,File),
+  Tab.
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])          -> creat(S,Tab).

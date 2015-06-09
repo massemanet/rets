@@ -581,12 +581,10 @@ t15() ->
   ?assertEqual({200,[{tebbe,0},{tibbe,0}]},
                rets_client:get(localhost)),
 
-  %% After restart: both tables & the index should be saved to disk
+  %% After restart: both tables should be saved to disk
   restart_rets(ets),
-  Files1 = file:list_dir("/tmp/rets/db"),
-  ?assertMatch({ok, _}, Files1),
-  ?assertEqual(["idx.term", "tebbe.tab","tibbe.tab"],
-               lists:sort(element(2, Files1))),
+  ?assertEqual({ok,["tebbe","tibbe"]},
+               file:list_dir("/tmp/rets/db/ets")),
 
   %% Delete one of the tables
   ?assertEqual({200,true},
@@ -596,10 +594,8 @@ t15() ->
 
   %% After restart: only one table & the index should be saved to disk
   restart_rets(ets),
-  Files2 = file:list_dir("/tmp/rets/db"),
-  ?assertMatch({ok, _}, Files2),
-  ?assertEqual(["idx.term", "tebbe.tab"],
-               lists:sort(element(2, Files2))).
+  ?assertEqual({ok,["tebbe"]},
+               file:list_dir("/tmp/rets/db/ets")).
 
 restart_rets(Backend) ->
   application:stop(rets),
