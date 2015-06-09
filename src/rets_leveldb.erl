@@ -53,24 +53,30 @@ terminate(S) ->
   fold_lvl(S,fun(Lvl,_) -> delete_tab(S,Lvl) end).
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
-create(S ,[Tab])          -> {create_tab(S,Tab)}.
-delete(S ,[Tab])          -> {delete_tab(S,catch get_lvl(S,Tab)),S};
-delete(S ,[Tab,Key])      -> {deleter(get_lvl(S,Tab),Key),S}.
+create(S ,[Tab])          -> {create_tab(S,Tab),S}.
+delete(S ,[Tab])          -> {delete_tab(S,Tab),S};
+delete(S ,[Tab,Key])      -> {deleter(assert_lvl(S,Tab),Key),S}.
 sizes(S  ,[])             -> {siz(S),S}.
-keys(S   ,[Tab])          -> {key_getter(get_lvl(S,Tab)),S}.
-insert(S ,[Tab,KVs])      -> {ins(get_lvl(S,Tab),KVs),S};
-insert(S ,[Tab,K,V])      -> {ins(get_lvl(S,Tab),[{K,V}]),S}.
-bump(S   ,[Tab,Key,I])    -> {update_counter(get_lvl(S,Tab),Key,I),S};
-bump(S   ,[Tab,Key,L,H])  -> {update_counter(get_lvl(S,Tab),Key,L,H),S}.
-reset(S  ,[Tab,Key,I])    -> {reset_counter(get_lvl(S,Tab),Key,I),S}.
-next(S   ,[Tab,Key])      -> {next_prev(next,get_lvl(S,Tab),Key),S}.
-prev(S   ,[Tab,Key])      -> {next_prev(prev,get_lvl(S,Tab),Key),S}.
-multi(S  ,[Tab,Key])      -> {getter(get_lvl(S,Tab),multi,Key),S}.
-single(S ,[Tab,Key])      -> {getter(get_lvl(S,Tab),single,Key),S}.
-via(S    ,[Tab,Key,TabI]) -> {via(get_lvl(S,TabI),get_lvl(S,Tab),Key),S}.
+keys(S   ,[Tab])          -> {key_getter(assert_lvl(S,Tab)),S}.
+insert(S ,[Tab,KVs])      -> {ins(assert_lvl(S,Tab),KVs),S};
+insert(S ,[Tab,K,V])      -> {ins(assert_lvl(S,Tab),[{K,V}]),S}.
+bump(S   ,[Tab,Key,I])    -> {update_counter(assert_lvl(S,Tab),Key,I),S};
+bump(S   ,[Tab,Key,L,H])  -> {update_counter(assert_lvl(S,Tab),Key,L,H),S}.
+reset(S  ,[Tab,Key,I])    -> {reset_counter(assert_lvl(S,Tab),Key,I),S}.
+next(S   ,[Tab,Key])      -> {next_prev(assert_lvl(S,Tab),next,Key),S}.
+prev(S   ,[Tab,Key])      -> {next_prev(assert_lvl(S,Tab),prev,Key),S}.
+multi(S  ,[Tab,Key])      -> {getter(assert_lvl(S,Tab),multi,Key),S}.
+single(S ,[Tab,Key])      -> {getter(assert_lvl(S,Tab),single,Key),S}.
+via(S    ,[Tab,Key,TabI]) -> {via(assert_lvl(S,TabI),assert_lvl(S,Tab),Key),S}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% the implementetion
+
+assert_lvl(S,Tab) ->
+  case get_lvl(S,Tab) of
+    undefined -> throw({404,no_such_table});
+    Lvl       -> Lvl
+end.
 
 create_tab(S,Tab) ->
   case get_lvl(S,Tab) of
@@ -78,17 +84,28 @@ create_tab(S,Tab) ->
     #lvl{}    -> false
   end.
 
-delete_tab(S,Lvl = #lvl{}) ->
-  get_rid_of(Lvl,S#state.keep_db),
-  true;
-delete_tab(_,_) ->
-  false.
+delete_tab(S,Tab) ->
+  case get_lvl(S,Tab) of
+    undefined ->
+      false;
+    Lvl ->
+      get_rid_of(Lvl,S#state.keep_db),
+      delete_lvl(S,Lvl),
+      true
+  end.
 
 get_rid_of(Lvl,false) -> lvl_destroy(Lvl);
 get_rid_of(Lvl,true)  -> lvl_close(Lvl).
 
 siz(S) ->
-  fold_lvl(S,fun(Lvl,O) -> [{Lvl#lvl.name,undefined}|O] end).
+  case fold_lvl(S,fun(Lvl,O) -> [{tab_name(Lvl),tab_size(Lvl)}|O] end) of
+    [] -> [];
+    Tabs -> {Tabs}
+  end.
+
+tab_name(Lvl) -> list_to_binary(Lvl#lvl.name).
+
+tab_size(Lvl) -> length(key_getter(Lvl)).
 
 key_getter(Lvl) ->
   Iter = lvl_iter(Lvl,keys_only),
@@ -101,7 +118,7 @@ key_getter(Lvl) ->
 key_getter_loop(invalid_iterator,_,Acc) ->
   Acc;
 key_getter_loop(K,Iter,Acc) ->
-  key_getter_loop(lvl_mv_iter(Iter,prefetch),Iter,[K|Acc]).
+  key_getter_loop(lvl_mv_iter(Iter,prefetch),Iter,[pack_key(K)|Acc]).
 
 update_counter(Lvl,Key,Incr) ->
   case lvl_get(Lvl,Key) of
@@ -129,54 +146,50 @@ ins(Lvl,KVs) ->
 
 ins_ifempty(Lvl,Key,Val) ->
   case lvl_get(Lvl,Key) of
-    not_found -> do_ins(Lvl,Key,Val);
-    Vl        -> throw({409,{key_exists,{Lvl#lvl.name,Key,Vl}}})
+    not_found -> lvl_put(Lvl,Key,Val);
+    Value     -> throw({409,{key_exists,{Lvl#lvl.name,Key,Value}}})
   end.
 
 ins_overwrite(Lvl,Key,Val) ->
-  do_ins(Lvl,Key,Val).
-
-do_ins(Lvl,Key,Val) ->
-  lvl_put(Lvl,Key,pack_val(Val)),
-  Val.
+  lvl_put(Lvl,Key,Val).
 
 %% get data from leveldb.
 %% allow wildcards (".") in keys
-getter(Lvl,single,Ekey) ->
-  case getter(Lvl,multi,Ekey) of
+getter(Lvl,single,Key) ->
+  case getter(Lvl,multi,Key) of
     {[{_,V}]} -> V;
     _         -> throw({404,multiple_hits})
   end;
-getter(Lvl,multi,Ekey) ->
-  case lvl_get(Lvl,Ekey) of
+getter(Lvl,multi,Key) ->
+  case lvl_get(Lvl,Key) of
     not_found ->
-      case next(Lvl,Ekey,Ekey,[]) of
+      case next(Lvl,Key,Key,[]) of
         [] -> throw({404,no_such_key});
         As -> {As}
       end;
     Val ->
-      {[{unmk_ekey(Ekey),Val}]}
+      {[{pack_key(Key),Val}]}
   end.
 
-next(Lvl,Key,WKey,Acc) ->
-  case next_prev(Lvl,next,Key) of
+next(Lvl,PrevKey,WildKey,Acc) ->
+  case nextprev(Lvl,next,PrevKey) of
     end_of_table -> lists:reverse(Acc);
     {Key,V} ->
-      case key_match(WKey,mk_ekey(Key)) of
-        true -> next(Lvl,Key,WKey,[{Key,unpack_val(V)}|Acc]);
+      case key_match(WildKey,Key) of
+        true -> next(Lvl,Key,WildKey,[{pack_key(Key),V}|Acc]);
         false-> Acc
       end
   end.
 
 key_match([],[])               -> true;
-key_match(["."|Wkey],[_|Ekey]) -> key_match(Wkey,Ekey);
-key_match([E|Wkey],[E|Ekey])   -> key_match(Wkey,Ekey);
+key_match(["."|Wkey],[_|Key]) -> key_match(Wkey,Key);
+key_match([E|Wkey],[E|Key])   -> key_match(Wkey,Key);
 key_match(_,_)                 -> false.
 
 next_prev(Lvl,OP,Key) ->
   case nextprev(Lvl,OP,Key) of
     end_of_table -> throw({409,end_of_table});
-    {NewKey,V}   -> {[{NewKey,unpack_val(V)}]}
+    {NewKey,V}   -> {[{NewKey,V}]}
   end.
 
 nextprev(Lvl,OP,Key) ->
@@ -187,29 +200,25 @@ nextprev(Lvl,OP,Key) ->
     lvl_close_iter(Iter)
   end.
 
-check_np(prev,invalid_iterator,Iter,Key) ->
+check_np(prev,invalid_iterator,Iter,_Key) ->
   %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
   %% case of TK being the last record, it will return an
   %% invalid_iterator and we have to fix the situation here
-  check_np(prev,lvl_mv_iter(Iter,last),Key);
+  check_np(lvl_mv_iter(Iter,last));
 check_np(prev,{KeyNext,_},Iter,Key) when KeyNext >= Key ->
   %% lvl_mv_iter/2 moved the iterator to the first record not before
   %% TK: we are interested in the previous record, so an additional
   %% iterator step is necessary
-  check_np(prev,lvl_mv_iter(Iter,prev),Key);
+  check_np(lvl_mv_iter(Iter,prev));
 check_np(next,{Key,_},Iter,Key) ->
   %% the requested key was in the table: an additional iterator step
   %% is necessary
-  check_np(next,lvl_mv_iter(Iter,next),Key);
-check_np(next,KV,_Iter,Key) ->
-  check_np(next,KV,Key).
+  check_np(lvl_mv_iter(Iter,next));
+check_np(next,KV,_Iter,_Key) ->
+  check_np(KV).
 
-check_np(_,invalid_iterator,_) ->
-  end_of_table;
-check_np(OP,{K2,V},K1) when OP =:= next andalso K1 < K2;
-                            OP =:= prev andalso K2 < K1 ->
-  {K2,V}.
-
+check_np(invalid_iterator) -> end_of_table;
+check_np(KV) -> KV.
 
 deleter(Lvl,Key) ->
   case lvl_get(Lvl,Key) of
@@ -237,7 +246,7 @@ via(Lvl1,Lvl2,Key2) ->
   %%   external format before saving in Tab2
   case lvl_get(Lvl2,Key2) of
     not_found -> via(Lvl1,[],Lvl2,Key2,false);
-    Key1      -> via(Lvl1,mk_ekey(Key1),Lvl2,Key2,true)
+    Key1      -> via(Lvl1,Key1,Lvl2,Key2,true)
   end.
 
 via(Lvl1,Key1,Lvl2,Key2,Retry) ->
@@ -246,24 +255,10 @@ via(Lvl1,Key1,Lvl2,Key2,Retry) ->
       via(Lvl1,[],Lvl2,Key2,false);
     end_of_table ->
       throw({409,end_of_table});
-    {NextKey,V} ->
-      NextVal = unpack_val(V),
+    {NextKey,NextVal} ->
       ins_overwrite(Lvl2,Key2,NextKey),
       {[{NextKey,NextVal}]}
   end.
-
-%% data packing
-pack_val(Val) ->
-  term_to_binary(Val).
-unpack_val(Val) ->
-  binary_to_term(Val).
-
-%% key mangling
-mk_ekey(Bin) ->
-  string:tokens(binary_to_list(Bin),"/").
-
-unmk_ekey(EList) ->
-  list_to_binary(string:join(EList,"/")).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% handle the table of tables
@@ -271,17 +266,20 @@ unmk_ekey(EList) ->
 create_lvl() ->
   ets:new(rets_leveldb_tabs,[named_table,ordered_set,{keypos,2}]).
 
+delete_lvl(S,Lvl) ->
+  ets:delete(S#state.tabs,Lvl#lvl.name).
+
 put_lvl(S,Lvl) ->
   ets:insert(S#state.tabs,Lvl).
 
 get_lvl(S,Tab) ->
   case ets:lookup(S#state.tabs,Tab) of
     [Lvl=#lvl{}]  -> Lvl;
-    []            -> throw({404,no_such_table})
+    []            -> undefined
   end.
 
 fold_lvl(S,Fun) ->
-  ets:foldl(Fun,[],S#state.tabs).
+  ets:foldr(Fun,[],S#state.tabs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% leveldb API
@@ -310,29 +308,34 @@ lvl_iter(Lvl,What) ->
 lvl_close_iter(Iter) ->
   eleveldb:iterator_close(Iter).
 
-lvl_mv_iter(Iter,Where) ->
+lvl_mv_iter(Iter,Target) ->
+  Where =
+    case is_atom(Target) of
+      true -> Target;
+      false-> pack_key(Target)
+    end,
   case eleveldb:iterator_move(Iter,Where) of
-    {ok,Key,Val}             -> {Key,Val};
-    {ok,Key}                 -> Key;
+    {ok,Key,Val}             -> {unpack_key(Key),unpack_val(Val)};
+    {ok,Key}                 -> unpack_key(Key);
     {error,invalid_iterator} -> invalid_iterator;
     {error,Err}              -> throw({500,{iter_error,Err}})
   end.
 
 lvl_get(Lvl,Key) ->
-  case eleveldb:get(Lvl#lvl.handle,Key,[]) of
+  case eleveldb:get(Lvl#lvl.handle,pack_key(Key),[]) of
     {ok,V}      -> unpack_val(V);
     not_found   -> not_found;
     {error,Err} -> throw({500,{get_error,Err}})
   end.
 
 lvl_put(Lvl,Key,Val) ->
-  case eleveldb:put(Lvl#lvl.handle,Key,Val,[]) of
+  case eleveldb:put(Lvl#lvl.handle,pack_key(Key),pack_val(Val),[]) of
     ok          -> Val;
     {error,Err} -> throw({500,{put_error,Err}})
   end.
 
 lvl_delete(Lvl,Key) ->
-  case eleveldb:delete(Lvl#lvl.handle,Key,[]) of
+  case eleveldb:delete(Lvl#lvl.handle,pack_key(Key),[]) of
     ok          -> true;
     {error,Err} -> throw({500,{delete_error,Err}})
   end.
@@ -343,3 +346,18 @@ lvl_destroy(Lvl) ->
     ok          -> true;
     {error,Err} -> throw({500,{delete_error,Err}})
   end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% data packing
+
+pack_val(Val) ->
+  term_to_binary(Val).
+unpack_val(Val) ->
+  binary_to_term(Val).
+
+%% key mangling
+unpack_key(Bin) ->
+  string:tokens(binary_to_list(Bin),"/").
+
+pack_key(EList) ->
+  list_to_binary(string:join(EList,"/")).
