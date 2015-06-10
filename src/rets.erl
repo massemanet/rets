@@ -534,7 +534,12 @@ t13(SETUP) ->
                proplists:get_value(backend,rets:state())).
 
 t14(Backend) ->
+  %% Clean out the DB
   application:set_env(rets, keep_db, false),
+  restart_rets(Backend),
+
+  %% restart with keep_db == true
+  application:set_env(rets, keep_db, true),
   restart_rets(Backend),
 
   %% Here the DB is empty
@@ -552,7 +557,6 @@ t14(Backend) ->
                rets_client:get(localhost,tebbe,a)),
 
   %% Restart rets when keep_db is set
-  application:set_env(rets, keep_db, true),
   restart_rets(Backend),
 
   %% Verify the data stayed
