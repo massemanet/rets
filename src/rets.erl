@@ -347,6 +347,8 @@ t06(SETUP) ->
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
+  ?assertEqual({200,false},
+               rets_client:put(localhost,tibbe)),  % double create
   ?assertEqual({404,"no_such_key"},
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({200,true},
@@ -357,6 +359,8 @@ t06(SETUP) ->
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({200,true},
                rets_client:delete(localhost,tibbe)),
+  ?assertEqual({200,false},
+               rets_client:delete(localhost,tibbe)), % double delete
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe,17)),
   ?assertEqual({404,"no_such_table"},
