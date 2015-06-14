@@ -28,9 +28,9 @@
         }).
 
 -record(lvl,
-        {name,
-         file,
-         handle}).
+        {name,        % string(Basename)
+         file,        % string(Dirname)
+         handle}).    % binary(NifHandle)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% the API
@@ -334,7 +334,7 @@ lvl_delete(Lvl,Key) ->
 lvl_destroy(Lvl) ->
   lvl_close(Lvl),
   case eleveldb:destroy(Lvl#lvl.file,[]) of
-    ok          -> true;
+    ok          -> file:del_dir(Lvl#lvl.file),true;
     {error,Err} -> throw({500,{delete_error,Err}})
   end.
 

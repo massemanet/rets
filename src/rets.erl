@@ -178,42 +178,44 @@ je(Term) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% ets_dont_keep_test_() ->
-%%   SETUP =
-%%     fun() ->
-%%         application:set_env(rets,keep_db,false),
-%%         restart_rets(ets)
-%%     end,
-%%  tests(SETUP).
+-define(dont_keep(SETUP),
+        [fun() -> t00(SETUP) end,
+         fun() -> t01(SETUP) end,
+         fun() -> t02(SETUP) end,
+         fun() -> t03(SETUP) end,
+         fun() -> t04(SETUP) end,
+         fun() -> t05(SETUP) end,
+         fun() -> t06(SETUP) end,
+         fun() -> t07(SETUP) end,
+         fun() -> t08(SETUP) end,
+         fun() -> t09(SETUP) end,
+         fun() -> t10(SETUP) end,
+         fun() -> t11(SETUP) end,
+         fun() -> t12(SETUP) end,
+         fun() -> t13(SETUP) end
+        ]).
+
+-define(keep_db(Backend),
+        [fun() -> t14(Backend) end,
+         fun() -> t15(Backend) end]).
 
 leveldb_dont_keep_test_() ->
-  SETUP =
-    fun() ->
-        application:set_env(rets,keep_db,false),
-        restart_rets(leveldb)
-    end,
-  [fun() -> t00(SETUP) end,
-   fun() -> t01(SETUP) end,
-   fun() -> t02(SETUP) end,
-   fun() -> t03(SETUP) end,
-   fun() -> t04(SETUP) end,
-   fun() -> t05(SETUP) end,
-   fun() -> t06(SETUP) end,
-   fun() -> t07(SETUP) end,
-   fun() -> t08(SETUP) end,
-   fun() -> t09(SETUP) end,
-   fun() -> t10(SETUP) end,
-   fun() -> t11(SETUP) end,
-   fun() -> t12(SETUP) end,
-   fun() -> t13(SETUP) end
-  ].
+  ?dont_keep(mk_setup(leveldb,false)).
 
-keep_db_test_() ->
-  [fun() -> t14(leveldb) end,
-   fun() -> t14(ets) end].
+ets_dont_keep_test_() ->
+  ?dont_keep(mk_setup(ets,false)).
 
-keep_ets_test_() ->
-  [fun() -> t15() end].
+ets_keep_test_() ->
+  ?keep_db(ets).
+
+leveldb_keep_test_() ->
+  ?keep_db(leveldb).
+
+mk_setup(Backend,KeepDB) ->
+  fun() ->
+      application:set_env(rets,keep_db,KeepDB),
+      restart_rets(Backend)
+  end.
 
 t00(SETUP) ->
   SETUP(),
@@ -534,10 +536,6 @@ t13(SETUP) ->
                proplists:get_value(backend,rets:state())).
 
 t14(Backend) ->
-  %% Clean out the DB
-  application:set_env(rets, keep_db, false),
-  restart_rets(Backend),
-
   %% restart with keep_db == true
   application:set_env(rets, keep_db, true),
   restart_rets(Backend),
@@ -573,9 +571,13 @@ t14(Backend) ->
   ?assertEqual({200,[]},
                rets_client:get(localhost)).
 
-t15() ->
+t15(Backend) ->
+  %% Clean out the DB
+  application:set_env(rets, keep_db, false),
+  restart_rets(Backend),
+
   application:set_env(rets, keep_db, true),
-  restart_rets(ets),
+  restart_rets(Backend),
 
   %% Create two tables
   ?assertEqual({200, true},
@@ -586,9 +588,9 @@ t15() ->
                rets_client:get(localhost)),
 
   %% After restart: both tables should be saved to disk
-  restart_rets(ets),
+  restart_rets(Backend),
   ?assertEqual({ok,["tebbe","tibbe"]},
-               file:list_dir("/tmp/rets/db/ets")),
+               file:list_dir(filename:join("/tmp/rets/db",Backend))),
 
   %% Delete one of the tables
   ?assertEqual({200,true},
@@ -596,10 +598,10 @@ t15() ->
   ?assertEqual({200,[{tebbe,0}]},
                rets_client:get(localhost)),
 
-  %% After restart: only one table & the index should be saved to disk
-  restart_rets(ets),
+  %% After restart: only one table should be saved to disk
+  restart_rets(Backend),
   ?assertEqual({ok,["tebbe"]},
-               file:list_dir("/tmp/rets/db/ets")).
+               file:list_dir(filename:join("/tmp/rets/db",Backend))).
 
 restart_rets(Backend) ->
   application:stop(rets),
