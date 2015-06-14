@@ -45,7 +45,7 @@ terminate(KeepDB,S) ->
 
 %% ::(#state{},list(term(Args)) -> {jiffyable(Reply),#state{}}
 create(S ,[Tab])          -> {create_tab(S,Tab),S}.
-delete(S ,[Tab])          -> {delete_tab(S,Tab,false),S};
+delete(S ,[Tab])          -> {delete_tab(S,get_lvl(S,Tab),false),S};
 delete(S ,[Tab,Key])      -> {deleter(assert_lvl(S,Tab),Key),S}.
 sizes(S  ,[])             -> {siz(S),S}.
 keys(S   ,[Tab])          -> {key_getter(assert_lvl(S,Tab)),S}.
@@ -75,11 +75,11 @@ create_tab(S,Tab) ->
     #lvl{}    -> false
   end.
 
-delete_tab(S,Tab,KeepDB) ->
-  case get_lvl(S,Tab) of
+delete_tab(S,Lvl,KeepDB) ->
+  case Lvl of
     undefined ->
       false;
-    Lvl ->
+    #lvl{} ->
       get_rid_of(KeepDB,Lvl),
       delete_lvl(S,Lvl),
       true
