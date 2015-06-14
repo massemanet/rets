@@ -200,25 +200,30 @@ je(Term) ->
          fun() -> t15(Backend) end]).
 
 leveldb_dont_keep_test_() ->
-  ?dont_keep(mk_setup(leveldb,false)).
+  ?dont_keep(mk_setup(leveldb)).
 
 ets_dont_keep_test_() ->
-  ?dont_keep(mk_setup(ets,false)).
+  ?dont_keep(mk_setup(ets)).
 
 ets_keep_test_() ->
-  ?keep_db(ets).
+  ?keep_db(mk_setup(ets)).
 
 leveldb_keep_test_() ->
-  ?keep_db(leveldb).
+  ?keep_db(mk_setup(leveldb)).
 
-mk_setup(Backend,KeepDB) ->
-  fun() ->
-      application:set_env(rets,keep_db,KeepDB),
-      restart_rets(Backend)
+mk_setup(Backend) ->
+  fun(reset) ->
+      application:set_env(rets,keep_db,false),    % delete old database files
+      restart_rets(Backend);
+     (keep) ->
+      application:set_env(rets,keep_db,true),     % keep old database files
+      restart_rets(Backend);
+     (backend) ->
+      Backend
   end.
 
 t00(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,false},
                rets_client:delete(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -255,7 +260,7 @@ t00(SETUP) ->
                rets_client:get(localhost,tibbe,"ddd")).
 
 t01(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -280,7 +285,7 @@ t01(SETUP) ->
                rets_client:get(localhost,tibbe,ddd)).
 
 t02(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -293,7 +298,7 @@ t02(SETUP) ->
                rets_client:get(localhost,tibbe,ddd)).
 
 t03(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,1},
@@ -308,7 +313,7 @@ t03(SETUP) ->
                rets_client:put(localhost,tibbe,bbb,counter)).
 
 t04(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,[]},
                rets_client:get(localhost)),
   ?assertEqual({200,true},
@@ -331,7 +336,7 @@ t04(SETUP) ->
                rets_client:get(localhost)).
 
 t05(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -342,7 +347,7 @@ t05(SETUP) ->
                rets_client:put(localhost,tibbe,foo,a)).
 
 t06(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -367,7 +372,7 @@ t06(SETUP) ->
                rets_client:get(localhost,tibbe)).
 
 t07(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({404,"no_such_table"},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -398,7 +403,7 @@ t07(SETUP) ->
                rets_client:get(localhost,tibbe,'b/./.',multi)).
 
 t08(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   T = [{"a","a"},{"b",[{"bb","bb"}]}], %% nested proplist
   ?assertEqual({200,true},
                rets_client:put(localhost,tybbe)),
@@ -408,7 +413,7 @@ t08(SETUP) ->
                rets_client:get(localhost,tybbe,"abc")).
 
 t09(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
   ?assertEqual({409,"end_of_table"},
@@ -429,7 +434,7 @@ t09(SETUP) ->
                rets_client:get(localhost,tebbe,0,next)).
 
 t10(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   %% This test verifies that if we have multiple tables performing a
   %% next on the first table's last element won't return the second
   %% table's first element.
@@ -491,7 +496,7 @@ t10(SETUP) ->
                rets_client:get(localhost,tibbe,"c",prev)).
 
 t11(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tebbe)),
   ?assertEqual({200,true},
@@ -516,7 +521,7 @@ t11(SETUP) ->
                rets_client:get(localhost,tibbe,a)).
 
 t12(SETUP) ->
-  SETUP(),
+  SETUP(reset),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe)),
   ?assertEqual({200,2},
@@ -535,14 +540,16 @@ t12(SETUP) ->
                rets_client:put(localhost,tibbe,bbb,{counter,1,1})).
 
 t13(SETUP) ->
-  SETUP(),
-  ?assertMatch(A when A==ets;A==leveldb,
+  SETUP(reset),
+  BE = SETUP(backend),
+  ?assertMatch(A when A==BE,
                proplists:get_value(backend,rets:state())).
 
-t14(Backend) ->
+t14(SETUP) ->
+  SETUP(reset),
+
   %% restart with keep_db == true
-  application:set_env(rets, keep_db, true),
-  restart_rets(Backend),
+  SETUP(keep),
 
   %% Here the DB is empty
   ?assertEqual({200,[]},
@@ -559,7 +566,7 @@ t14(Backend) ->
                rets_client:get(localhost,tebbe,a)),
 
   %% Restart rets when keep_db is set
-  restart_rets(Backend),
+  SETUP(keep),
 
   %% Verify the data stayed
   ?assertEqual({200,[{tebbe,1}]},
@@ -568,20 +575,16 @@ t14(Backend) ->
                rets_client:get(localhost,tebbe,a)),
 
   %% Restart rets when keep_db is not set
-  application:set_env(rets, keep_db, false),
-  restart_rets(Backend),
+  SETUP(reset),
 
   %% Verify the data vanished
   ?assertEqual({200,[]},
                rets_client:get(localhost)).
 
-t15(Backend) ->
-  %% Clean out the DB
-  application:set_env(rets, keep_db, false),
-  restart_rets(Backend),
+t15(SETUP) ->
+  SETUP(reset),
 
-  application:set_env(rets, keep_db, true),
-  restart_rets(Backend),
+  SETUP(keep),
 
   %% Create two tables
   ?assertEqual({200, true},
@@ -592,9 +595,9 @@ t15(Backend) ->
                rets_client:get(localhost)),
 
   %% After restart: both tables should be saved to disk
-  restart_rets(Backend),
+  SETUP(keep),
   ?assertEqual({ok,["tebbe","tibbe"]},
-               file:list_dir(filename:join("/tmp/rets/db",Backend))),
+               file:list_dir(filename:join("/tmp/rets/db",SETUP(backend)))),
 
   %% Delete one of the tables
   ?assertEqual({200,true},
@@ -603,9 +606,9 @@ t15(Backend) ->
                rets_client:get(localhost)),
 
   %% After restart: only one table should be saved to disk
-  restart_rets(Backend),
+  SETUP(keep),
   ?assertEqual({ok,["tebbe"]},
-               file:list_dir(filename:join("/tmp/rets/db",Backend))).
+               file:list_dir(filename:join("/tmp/rets/db",SETUP(backend)))).
 
 restart_rets(Backend) ->
   application:stop(rets),
@@ -614,7 +617,7 @@ restart_rets(Backend) ->
   %% supervisor process terminates. But if we are not lucky and try to
   %% restart very quickly we may get an `eaddrinuse'. So let's just
   %% wait a little bit here.
-  timer:sleep(5),
+  timer:sleep(50),
   {ok,_} = start(Backend).
 
 -endif. % TEST
