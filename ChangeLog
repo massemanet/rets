@@ -1,9 +1,118 @@
-commit 0254902fc070091ad0146dad396150f2da476e4e
+commit 90d8194720c73cda099d1ce3385616d63d052455
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Mon Jun 15 17:22:08 2015 +0200
+
+    v0.10.0
+
+src/rets.app.src
+
+commit 8e2731e1916f86286aa477ea421ced3d8d856e91
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Sun Jun 14 15:24:14 2015 +0200
+
+    fix type error in table deletion
+
+src/rets_leveldb.erl
+
+commit 7b96ab60210ad9a8a03ec560d84759f4d97771a2
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Sun Jun 14 15:16:07 2015 +0200
+
+    tests
+
+src/rets.erl
+
+commit 27ed209842f12a2caf4f97c6d52f621f0477cd7e
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Sun Jun 14 14:44:02 2015 +0200
+
+    more tests
+
+src/rets.erl
+
+commit 1d3127a3ef3bdab088ae15668de1ab6373b86b66
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Sun Jun 14 14:38:45 2015 +0200
+
+    fix leveldb table delete bug
+    eleveldb:destroy deletes all the table files, but not the top directory
+
+src/rets.erl
+src/rets_leveldb.erl
+
+commit 29344f16684c18e41f03164e23b7416861d8faa0
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jun 10 14:57:25 2015 +0200
+
+    fix type errors
+
+src/rets.erl
+src/rets_ets.erl
+
+commit c710f312ad0989daafd72bf701c255f08b7a59af
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Tue Jun 9 20:42:36 2015 +0200
+
+    refactor the persist machinery
+
+src/rets.erl
+src/rets_ets.erl
+src/rets_file.erl
+src/rets_handler.erl
+src/rets_leveldb.erl
+
+commit 5f7003d0cf38982e8b17ff12c45fe783c117e8df
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Tue Jun 9 16:50:14 2015 +0200
+
+    refactor in progress. leveldb stuff works, ets stuff broken.
+
+src/rets.erl
+src/rets_leveldb.erl
+
+commit 787eb4d2cf8a9ce56d05c04a4277344d81de66db
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Tue Jun 9 12:23:43 2015 +0200
+
+    fix some refactor fallout
+
+src/rets_leveldb.erl
+
+commit 7dc0535746c01a53a66e9a171ea9d9afba74fc49
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Mon Jun 8 13:33:27 2015 +0200
+
+    fix some refactor fallout
+
+src/rets_ets.erl
+src/rets_leveldb.erl
+
+commit be44627667f1a656599d9ccd5c1e2ccdadf077c0
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Mon Jun 8 13:05:28 2015 +0200
+
+    refactored rets_leveldb. compiles, many bugs.
+
+src/rets_leveldb.erl
+
+commit d2a56c6e568532c7964dc453c11082100ea3823c
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Fri Jun 5 16:49:14 2015 +0200
+
+    middle of refactoring. won't compile
+
+src/rets_file.erl
+src/rets_handler.erl
+src/rets_leveldb.erl
+
+commit 1b1e94da708d22c0b8c8f249826ae9b73127a8eb
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Fri Jun 5 10:57:12 2015 +0200
 
     v0.9.0
 
+AUTHORS
+ChangeLog
 src/rets.app.src
 
 commit 90a474a2dad9d3636c96a336f703128194fe6a45
