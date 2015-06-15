@@ -91,20 +91,28 @@ do_init(Args) ->
   S  = #state{},
   BE = getv(backend,Args,S#state.backend),
   KD = getv(keep_db,Args,S#state.keep_db),
-  TD = getv(table_dir,Args,S#state.table_dir),
+  BD = getv(table_dir,Args,S#state.table_dir),
+  TD = filename:join(BD,BE),
   CB = list_to_atom("rets_"++atom_to_list(BE)),
-  keep_or_delete_db(KD,TD),
+  filelib:ensure_dir(filename:join(TD,dummy)),
   {ok,S#state{
         backend   = BE,
         table_dir = TD,
         keep_db   = KD,
         env       = Args,
         cb_mod    = CB,
-        cb_state  = CB:init([{keep_db,KD},{table_dir,TD}])}}.
+        cb_state  = CB:init(TD,files(KD,TD))}}.
+
+files(false,TableDir) ->
+  rets_file:delete_recursively(TableDir),
+  filelib:ensure_dir(filename:join(TableDir,dummy)),
+  [];
+files(true,TableDir) ->
+  {ok,Files} = file:list_dir(TableDir),
+  Files.
 
 do_terminate(S) ->
-  (S#state.cb_mod):terminate(S#state.cb_state,S#state.keep_db),
-  keep_or_delete_db(S#state.keep_db,S#state.table_dir).
+  (S#state.cb_mod):terminate(S#state.keep_db,S#state.cb_state).
 
 do_handle_call({F,Args},State) ->
   try
@@ -112,31 +120,6 @@ do_handle_call({F,Args},State) ->
     {reply,{ok,Reply},State#state{cb_state=CBS}}
   catch
     throw:{Status,Term} -> {reply,{Status,Term},State}
-  end.
-
-keep_or_delete_db(true,_TableDir) -> ok;
-keep_or_delete_db(false,TableDir) -> delete_recursively(TableDir).
-
--include_lib("kernel/include/file.hrl").
--define(filetype(Type), #file_info{type=Type}).
-
-delete_recursively(File) ->
-  case file:read_file_info(File) of
-    {error,enoent} ->
-      ok;
-    {ok,?filetype(directory)} ->
-      {ok,Fs} = file:list_dir(File),
-      Del = fun(F) -> delete_recursively(filename:join(File,F)) end,
-      lists:foreach(Del,Fs),
-      delete_file(del_dir,File);
-    {ok,?filetype(regular)} ->
-      delete_file(delete,File)
-  end.
-
-delete_file(Op,File) ->
-  case file:Op(File) of
-    ok -> ok;
-    {error,Err} -> throw({500,{file_delete_error,{Err,File}}})
   end.
 
 getv(K,PL,Def) ->
