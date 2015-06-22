@@ -178,18 +178,18 @@ found_via(Tab2,Key2,{Key1,V}) ->
 %% any number of slash-separated elements, each of which is
 %% ALPHA / DIGIT / "-" / "." / "_" / "~"
 %%  "a/ddd/b/a_b_/1/3.14/x"
-%% an element can not be a single period, ".". the single period
+%% an element can not be a single underscore, "_". the single underscore
 %% is used as a wildcard in lookups.
 %% the internal representation is a tuple of string binaries;
 %%  {<<"a">>,<<"ddd">>,<<"b">>,<<"a_b_">>,<<"1">>,<<"3.14">>,<<"x">>}
 
 %% transform key, external to internal. there are two styles;
-%% "i", for inserts/deletes; "." is forbidden
-%% "l", for lookups; "." is a wildcard
+%% "i", for inserts/deletes; "_" is forbidden
+%% "l", for lookups; "_" is a wildcard
 
 key_e2i(Style,L) -> list_to_tuple([elem(Style,E) || E <- L]).
 
-elem(l,".") -> '_';
+elem(l,"_") -> '_';
 elem(_,E)   -> list_to_binary(E).
 
 %% transform key, internal to external.

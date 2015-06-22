@@ -145,7 +145,7 @@ ins_overwrite(Lvl,Key,Val) ->
   lvl_put(Lvl,Key,Val).
 
 %% get data from leveldb.
-%% allow wildcards (".") in keys
+%% allow wildcards ("_") in keys
 getter(Lvl,single,Key) ->
   case getter(Lvl,multi,Key) of
     {[{_,V}]} -> V;
@@ -172,10 +172,10 @@ next(Lvl,PrevKey,WildKey,Acc) ->
       end
   end.
 
-key_match([],[])               -> true;
-key_match(["."|Wkey],[_|Key]) -> key_match(Wkey,Key);
+key_match([],[])              -> true;
+key_match(["_"|Wkey],[_|Key]) -> key_match(Wkey,Key);
 key_match([E|Wkey],[E|Key])   -> key_match(Wkey,Key);
-key_match(_,_)                 -> false.
+key_match(_,_)                -> false.
 
 next_prev(Lvl,OP,Key) ->
   case nextprev(Lvl,OP,Key) of
@@ -192,13 +192,13 @@ nextprev(Lvl,OP,Key) ->
   end.
 
 check_np(prev,invalid_iterator,Iter,_Key) ->
-  %% lvl_mv_iter/2 moved the iterator to the first record after TK: in
-  %% case of TK being the last record, it will return an
+  %% lvl_mv_iter/2 moved the iterator to the first record after Key: in
+  %% case of Key being the last record, it will return an
   %% invalid_iterator and we have to fix the situation here
   check_np(lvl_mv_iter(Iter,last));
 check_np(prev,{KeyNext,_},Iter,Key) when KeyNext >= Key ->
   %% lvl_mv_iter/2 moved the iterator to the first record not before
-  %% TK: we are interested in the previous record, so an additional
+  %% Key: we are interested in the previous record, so an additional
   %% iterator step is necessary
   check_np(lvl_mv_iter(Iter,prev));
 check_np(next,{Key,_},Iter,Key) ->
@@ -347,8 +347,16 @@ unpack_val(Val) ->
   binary_to_term(Val).
 
 %% key mangling
+%% keys have already been checked for bad chars.
+
 unpack_key(Bin) ->
   string:tokens(binary_to_list(Bin),"/").
 
-pack_key(EList) ->
-  list_to_binary(string:join(EList,"/")).
+%% the "next" logic depends on a key with a wildcard being lexically in front
+%% of all its matching keys. we just truncate the key when we see a "_".
+pack_key(EList) -> list_to_binary(packer(EList)).
+
+packer([])      -> [];
+packer(["_"|_]) -> [];
+packer([H])     -> H;
+packer([H|T])   -> H++"/"++pack_key(T).

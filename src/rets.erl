@@ -103,7 +103,7 @@ chk_bp({Key,Val}) ->
   {chkk(string:tokens(binary_to_list(Key),"/")),Val}.
 
 chkk(Key) -> lists:map(fun chk_el/1,Key).
-chk_el(".") -> throw({404,key_element_is_period});
+chk_el("_") -> throw({404,key_element_is_single_underscore});
 chk_el(El)  -> El.
 
 i(Str) ->
@@ -237,7 +237,7 @@ t00(SETUP) ->
                                  {ccc,123.1},
                                  {ddd,[{a,"A"},{b,b},{c,123.3}]}])),
   ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,"aaa/./x")),
+               rets_client:get(localhost,tibbe,"aaa/_/x")),
   ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,true},
@@ -251,7 +251,7 @@ t00(SETUP) ->
   ?assertEqual({200,["aaa/1/x","bbb","ccc","ddd"]},
                rets_client:get(localhost,tibbe)),
   ?assertEqual({200,[$A,$A,$A,223]},
-               rets_client:get(localhost,tibbe,'./1/.')),
+               rets_client:get(localhost,tibbe,'_/1/_')),
   ?assertEqual({200,"bBbB"},
                rets_client:get(localhost,tibbe,bbb)),
   ?assertEqual({200,123.1},
@@ -272,9 +272,9 @@ t01(SETUP) ->
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,ddd,[{a,"A"},{b,b},{c,123.3}])),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'aaa/./x')),
+               rets_client:get(localhost,tibbe,'aaa/_/x')),
   ?assertEqual({200,"AAA"},
-               rets_client:get(localhost,tibbe,'./1/.')),
+               rets_client:get(localhost,tibbe,'_/1/_')),
   ?assertEqual({200,"AAA"},
                rets_client:get(localhost,tibbe,'aaa/1/x')),
   ?assertEqual({200,"bBbB"},
@@ -384,9 +384,9 @@ t07(SETUP) ->
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,'a/2/x',segundo)),
   ?assertEqual({200,"segundo"},
-               rets_client:get(localhost,tibbe,'a/./.')),
-  ?assertEqual({404,"key_element_is_period"},
-               rets_client:put(localhost,tibbe,'a/./.',s)),
+               rets_client:get(localhost,tibbe,'a/_/_')),
+  ?assertEqual({404,"key_element_is_single_underscore"},
+               rets_client:put(localhost,tibbe,'a/_/_',s)),
   ?assertEqual({200,true},
                rets_client:put(localhost,tibbe,'a/1/x',primo)),
   ?assertEqual({404,"no_such_key"},
@@ -396,11 +396,11 @@ t07(SETUP) ->
   ?assertEqual({200,1},
                rets_client:get(localhost,tibbe,'a')),
   ?assertEqual({404,"multiple_hits"},
-               rets_client:get(localhost,tibbe,'a/./.')),
+               rets_client:get(localhost,tibbe,'a/_/_')),
   ?assertEqual({200,[{"a/1/x","primo"},{"a/2/x","segundo"}]},
-               rets_client:get(localhost,tibbe,'a/./.',multi)),
+               rets_client:get(localhost,tibbe,'a/_/_',multi)),
   ?assertEqual({404,"no_such_key"},
-               rets_client:get(localhost,tibbe,'b/./.',multi)).
+               rets_client:get(localhost,tibbe,'b/_/_',multi)).
 
 t08(SETUP) ->
   SETUP(reset),
