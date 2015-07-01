@@ -38,8 +38,14 @@ state() ->
 cowboy_opts() ->
   [{name,rets_listener},
    {acceptors,100},
-   {opts,[{port, 7890}]},
+   {opts,[{port, cowboy_port()}]},
    {routes,[{'_', [{"/[...]", rets, []}]}]}].
+
+cowboy_port() ->
+  case application:get_env(rets,port_number) of
+    {ok,Port} -> Port;
+    undefined -> 7890
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% cowboy callbacks
