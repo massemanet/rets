@@ -6,6 +6,7 @@
 /deps/
 /bin/*[^sh]
 /ebin/
+erl_crash.dump
 *.o
 *.beam
 *.plt
