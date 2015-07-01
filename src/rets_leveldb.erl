@@ -166,16 +166,19 @@ next(Lvl,PrevKey,WildKey,Acc) ->
   case nextprev(Lvl,next,PrevKey) of
     end_of_table -> lists:reverse(Acc);
     {Key,V} ->
-      case key_match(WildKey,Key) of
-        true -> next(Lvl,Key,WildKey,[{pack_key(Key),V}|Acc]);
-        false-> Acc
+      case key_match(exact,WildKey,Key) of
+        matched  -> next(Lvl,Key,WildKey,[{pack_key(Key),V}|Acc]);
+        missed   -> next(Lvl,Key,WildKey,Acc);
+        finished -> Acc
       end
   end.
 
-key_match([],[])              -> true;
-key_match(["_"|Wkey],[_|Key]) -> key_match(Wkey,Key);
-key_match([E|Wkey],[E|Key])   -> key_match(Wkey,Key);
-key_match(_,_)                -> false.
+%% if we see a "_" before we see a miss, we must continue scanning
+key_match(_,[],[])              -> matched;
+key_match(_,["_"|Wkey],[_|Key]) -> key_match(wild,Wkey,Key);
+key_match(S,[E|Wkey],[E|Key])   -> key_match(S,Wkey,Key);
+key_match(exact,_,_)            -> finished;
+key_match(wild,_,_)             -> missed.
 
 next_prev(Lvl,OP,Key) ->
   case nextprev(Lvl,OP,Key) of
