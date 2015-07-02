@@ -35,7 +35,8 @@ else
 fi
 echo $OVSN"->"$NVSN
 
-sed  "s/[0-9]\.[0-9]\.[0-9]/$NVSN/" < $APPSRC > $$ && mv $$ $APPSRC
+sed  "s/vsn, *\"[0-9]*\.[0-9]*\.[0-9]*/vsn, \"$NVSN/" < $APPSRC > \
+     $$ && mv $$ $APPSRC
 git add $APPSRC
 git commit -m"v$NVSN"
 git log --name-only --no-merges | grep -Ev '^[ ]+$$|git-svn-id' > ChangeLog
