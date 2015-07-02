@@ -1,3 +1,11 @@
+commit 45d0bd48c36bd905c689230786e060a25814a019
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Thu Jul 2 12:04:39 2015 +0200
+
+    v0.10.1
+
+src/rets.app.src
+
 commit cd4ae636e1e01aaf260a71db92a9846020fd500f
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Thu Jul 2 11:08:24 2015 +0200
