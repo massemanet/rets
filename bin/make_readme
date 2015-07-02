@@ -1,0 +1,7 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -pa ebin
+main(_) ->
+  try rets_readme:go()
+  catch C:R -> io:fwrite("~p~n",[{C,R}])
+  end.
