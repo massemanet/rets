@@ -46,7 +46,8 @@ release: release_patch
 
 readme:
 	./bin/rets.sh restart
-	erl -pa ebin -detached -run rets_readme go
+	sleep 1
+	./bin/make_readme
 	./bin/rets.sh stop
 
 eunit: compile-all
