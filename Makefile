@@ -4,7 +4,7 @@ REBAR   ?= $(shell which rebar 2> /dev/null || which ./rebar)
 
 .PHONY: all compile compile-all get-deps update-deps clean test
 .PHONY: release release_patch release_minor release_major
-.PHONY: eunit xref dialyze
+.PHONY: eunit xref dialyze readme
 
 all: compile
 
@@ -25,7 +25,7 @@ clean:
 	@find . -name "*~" -exec rm {} \;
 	@$(REBAR) clean
 
-test: eunit xref dialyze
+test: eunit xref dialyze readme
 
 #############################################################################
 ## release stuff
@@ -43,6 +43,12 @@ release: release_patch
 
 #############################################################################
 ## testing
+
+readme:
+	./bin/rets.sh restart
+	sleep 1
+	./bin/make_readme
+	./bin/rets.sh stop
 
 eunit: compile-all
 	@$(REBAR) eunit skip_deps=true

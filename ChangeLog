@@ -1,9 +1,74 @@
-commit 90d8194720c73cda099d1ce3385616d63d052455
+commit cd4ae636e1e01aaf260a71db92a9846020fd500f
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Thu Jul 2 11:08:24 2015 +0200
+
+    make README
+
+Makefile
+
+commit 92e47a60b01488a08eeeb17c72289490f2069cec
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jul 1 16:44:12 2015 +0200
+
+    fix broken wildcard matches in the leveldb driver
+
+src/rets_leveldb.erl
+
+commit ffe1735211e84dd757bf8fdc863e287ec28a0213
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jul 1 16:43:25 2015 +0200
+
+    error logging
+
+src/rets.erl
+
+commit eb6c6a1ccc5a3959b7ec817be4d8ca62d8f53970
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jul 1 16:43:17 2015 +0200
+
+    set configs with flags to rets.sh
+
+bin/rets.sh
+src/rets.erl
+
+commit 1f7dd044e7fbe120b9481fb556b278fe25f53ea9
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jul 1 16:42:33 2015 +0200
+
+    move eunit to a separate file
+
+src/rets.erl
+src/rets_eunit.erl
+
+commit de70368c6f5917b05ca475cbbfda573344d4c9a2
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Wed Jul 1 16:41:44 2015 +0200
+
+    generate the README.md file
+
+.gitignore
+Makefile
+README.md
+src/rets_readme.erl
+
+commit 5ba0a4254bafa800040b9d04b838ec14265c628b
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Mon Jun 22 13:29:54 2015 +0200
+
+    switch wildcard char from "." to "_"
+    in a URI, "a/./b" is identical to "a/b".
+
+src/rets.erl
+src/rets_ets.erl
+src/rets_leveldb.erl
+
+commit c88b93df3fa88c23edd9b30c67c34b9aef8acfe9
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Mon Jun 15 17:22:08 2015 +0200
 
     v0.10.0
 
+ChangeLog
 src/rets.app.src
 
 commit 8e2731e1916f86286aa477ea421ced3d8d856e91

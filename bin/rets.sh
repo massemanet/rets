@@ -33,17 +33,65 @@ tryt() {
     exit -1
 }
 
-# (hopefully) self-explanatory config parameters
-# it should not be necessary to change anything outside of this block
+die() {
+    echo "$1"
+    exit 1
+}
+
+usage() {
+    echo "$0 [options]"
+    echo "-b database backend"
+    echo "-d data_dir"
+    echo "-k keep the data base between restarts"
+    echo "-l code dir (should contain ebin and deps)"
+    echo "-L logdir"
+    echo "-p port number"
+    echo "-u user name wto run service under"
+    status
+}
+
+status() {
+    echo "backend:  $ITEM_BACKEND"
+    echo "data dir: $ITEM_TABDIR"
+    echo "keep_db:  $ITEM_KEEPDB"
+    echo "libdir:   $ITEM_LIBDIR"
+    echo "logdir:   $ITEM_LOGDIR"
+    echo "port:     $ITEM_PORT"
+    echo "user:     $ITEM_USER"
+    exit 0
+}
+
 export ITEM=rets
+
+# default value of configs
 export ITEM_BACKEND=leveldb
-export ITEM_STARTMOD=$ITEM
+export ITEM_PORT=7890
 export ITEM_USER=$USER
+export ITEM_KEEPDB=false
 export ITEM_LOGDIR=`tryt /var/log /tmp`/$ITEM
 export ITEM_LIBDIR=`eval echo ~$ITEM_USER`/git/$ITEM
+export ITEM_TABDIR=$ITEM_LIBDIR/db
+
+# check command line flags
+while getopts ":b:d:p:u:hs" opt; do
+    case "$opt" in
+        b) ITEM_BACKEND=$OPTARG;;
+        d) ITEM_TABDIR=$OPTARG;;
+        l) ITEM_LIBDIR=$OPTARG;;
+        L) ITEM_LOGDIR=$OPTARG;;
+        p) ITEM_PORT=$OPTARG;;
+        u) ITEM_USER=$OPTARG;;
+        s) status;;
+        h) usage;;
+        ':') die "missing arg: $opt $OPTARG";;
+        '?') die "bad option: $OPTARG";;
+    esac
+done
+shift "$(($OPTIND-1))"
+
+export ITEM_STARTMOD=$ITEM
 export ITEM_DEPS="$ITEM_LIBDIR/deps/*"
 export ITEM_ERL=`which erl`
-export ITEM_TABDIR=$ITEM_LIBDIR/db
 export ITEM_GROUP=`id -g $ITEM_USER`
 export ITEM_BOOTLOG=$ITEM_LOGDIR/boot.log
 export ITEM_ERLLOG=$ITEM_LOGDIR/erlang.log
@@ -71,10 +119,10 @@ item_start() {
         -setcookie $ITEM \
         -boot start_sasl \
         -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
-        -kernel error_logger \"{file,\\\"$ITEM_ERLLOG\\\"}\" \
         -rets backend $ITEM_BACKEND \
         -rets table_dir \"$ITEM_TABDIR\" \
-        -rets keep_db false \
+        -rets keep_db $ITEM_KEEPDB \
+        -rets port_number $ITEM_PORT \
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \
@@ -100,6 +148,7 @@ out() {
 }
 
 out "`date | tr ' ' '-'` "
+
 case "$1" in
     status)
         P=`beamgrep $ITEM_USER "run $ITEM_STARTMOD"`
