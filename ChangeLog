@@ -1,9 +1,26 @@
-commit 45d0bd48c36bd905c689230786e060a25814a019
+commit 3e88fc391dab6c4e7f4d493596ce5f2bdcf37891
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Thu Jul 2 12:07:43 2015 +0200
+
+    v0.10.2
+
+src/rets.app.src
+
+commit ebd515ca4cdb7f5f6fad944e70740c84a072462c
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Thu Jul 2 12:07:11 2015 +0200
+
+    fix version mumber matching bug in release.sh
+
+bin/release.sh
+
+commit ee7af4c06768c9903e3251746bdcbd8ec8b61cee
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Thu Jul 2 12:04:39 2015 +0200
 
     v0.10.1
 
+ChangeLog
 src/rets.app.src
 
 commit cd4ae636e1e01aaf260a71db92a9846020fd500f
