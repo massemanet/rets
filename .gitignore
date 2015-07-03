@@ -3,6 +3,7 @@
 *~
 /.eunit/
 /.rebar/
+/db/
 /deps/
 /ebin/
 erl_crash.dump

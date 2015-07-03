@@ -143,9 +143,8 @@ item_stop() {
 
 item_shell() {
     HOST=`echo $HOSTNAME | cut -f1 -d"."`
-    sudo -u $ITEM_USER \
-        $ITEM_ERL \
-        -sname $$ -remsh ${ITEM_SNAME}@${HOST} -setcookie $ITEM
+    SHLCMD="$ITEM_ERL -sname $$ -remsh ${ITEM_SNAME}@${HOST} -setcookie $ITEM"
+    $CONTEXT "$SHLCMD"
 }
 
 out() {
