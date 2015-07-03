@@ -1,9 +1,27 @@
-commit 5b9c89a4e983385b6b720163ee7ec55e9768423e
+commit 75535eb1020ebdc83e9bc18aa08afb83815ea636
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Fri Jul 3 11:07:03 2015 +0200
+
+    v0.10.4
+
+src/rets.app.src
+
+commit e3082366e14dd878090daedd1582a2315f4c4539
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Fri Jul 3 11:06:22 2015 +0200
+
+    start script trickery
+
+Makefile
+bin/rets.sh
+
+commit 25a2dfea0c8a2ff70a743f05cdd2559aa638725e
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Thu Jul 2 12:20:27 2015 +0200
 
     v0.10.3
 
+ChangeLog
 src/rets.app.src
 
 commit 249f4955b16cdd65b8be9a18f96f25818a17ed87
