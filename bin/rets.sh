@@ -73,7 +73,7 @@ export ITEM_LIBDIR=`eval echo ~$ITEM_USER`/git/$ITEM
 export ITEM_TABDIR=$ITEM_LIBDIR/db
 
 # check command line flags
-while getopts ":b:d:p:u:hs" opt; do
+while getopts ":b:d:l:L;p:u:hs" opt; do
     case "$opt" in
         b) ITEM_BACKEND=$OPTARG;;
         d) ITEM_TABDIR=$OPTARG;;
@@ -87,7 +87,8 @@ while getopts ":b:d:p:u:hs" opt; do
         '?') die "bad option: $OPTARG";;
     esac
 done
-shift "$(($OPTIND-1))"
+FLAGS="${@:1:OPTIND-1}"
+ACTION="${!OPTIND}"
 
 export ITEM_STARTMOD=$ITEM
 export ITEM_DEPS="$ITEM_LIBDIR/deps/*"
@@ -96,6 +97,12 @@ export ITEM_GROUP=`id -g $ITEM_USER`
 export ITEM_BOOTLOG=$ITEM_LOGDIR/boot.log
 export ITEM_ERLLOG=$ITEM_LOGDIR/erlang.log
 export ITEM_SNAME=`echo $ITEM | tr "\-." "_"`
+
+if [ "$USER" == "$ITEM_USER" ]; then
+    CONTEXT="eval"
+else
+    CONTEXT="su ${ITEM_USER} --command"
+fi
 
 [ -d $ITEM_LOGDIR ] || mkdir $ITEM_LOGDIR
 chown $ITEM_USER:$ITEM_GROUP $ITEM_LOGDIR
@@ -113,25 +120,25 @@ item_start() {
     for dep in $ITEM_DEPS; do
         [ -d $dep/ebin ] && PAS="$PAS -pa $dep/ebin"
     done
-    sudo -u $ITEM_USER \
-        $ITEM_ERL  \
+    STARTCMD=" $ITEM_ERL \
         -sname $ITEM_SNAME \
         -setcookie $ITEM \
         -boot start_sasl \
-        -kernel error_logger "{file,\"$ITEM_ERLLOG\"}" \
+        -kernel error_logger \"{file,\\\"$ITEM_ERLLOG\\\"}\" \
         -rets backend $ITEM_BACKEND \
-        -rets table_dir \"$ITEM_TABDIR\" \
+        -rets table_dir \\\"$ITEM_TABDIR\\\" \
         -rets keep_db $ITEM_KEEPDB \
         -rets port_number $ITEM_PORT \
         -pa $ITEM_LIBDIR/ebin \
         $PAS \
         -run $ITEM_STARTMOD \
-        -detached
+        -detached"
+    ${CONTEXT} "${STARTCMD}"
 }
 
 item_stop() {
     P=`beamgrep $ITEM_USER "run $ITEM_STARTMOD"`
-    [ -n "$P" ] && sudo -u $ITEM_USER kill -KILL $P
+    [ -n "$P" ] && $CONTEXT "kill -KILL $P"
 }
 
 item_shell() {
@@ -149,7 +156,7 @@ out() {
 
 out "`date | tr ' ' '-'` "
 
-case "$1" in
+case "$ACTION" in
     status)
         P=`beamgrep $ITEM_USER "run $ITEM_STARTMOD"`
         [ -n "$P" ] && echo $P
@@ -167,9 +174,9 @@ case "$1" in
         ;;
     restart | force-reload)
         out "restarting."
-        $0 stop
+        $0 $FLAGS stop
         sleep 1
-        $0 start
+        $0 $FLAGS start
         ;;
     attach | shell)
         out "attaching $USER - $$."
@@ -177,7 +184,7 @@ case "$1" in
         out "detaching $USER - $$."
         ;;
     *)
-        echo "unrecognized command: $1"
-        out "unrecognized command: $1"
+        echo "unrecognized command: $ACTION"
+        out "unrecognized command: $ACTION"
         exit 1
 esac

@@ -25,7 +25,7 @@ clean:
 	@find . -name "*~" -exec rm {} \;
 	@$(REBAR) clean
 
-test: eunit xref dialyze readme
+test: readme eunit xref dialyze
 
 #############################################################################
 ## release stuff
@@ -45,7 +45,7 @@ release: release_patch
 ## testing
 
 readme:
-	./bin/rets.sh restart
+	./bin/rets.sh -l . -d /tmp/rets/db restart
 	sleep 1
 	./bin/make_readme
 	./bin/rets.sh stop
