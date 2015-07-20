@@ -75,12 +75,12 @@ export ITEM_TABDIR=$ITEM_LIBDIR/db
 # check command line flags
 while getopts ":b:d:l:L;p:u:hs" opt; do
     case "$opt" in
-        b) ITEM_BACKEND=$OPTARG;;
-        d) ITEM_TABDIR=$OPTARG;;
-        l) ITEM_LIBDIR=$OPTARG;;
-        L) ITEM_LOGDIR=$OPTARG;;
-        p) ITEM_PORT=$OPTARG;;
-        u) ITEM_USER=$OPTARG;;
+        b) export ITEM_BACKEND=$OPTARG;;
+        d) export ITEM_TABDIR=$OPTARG;;
+        l) export ITEM_LIBDIR=$OPTARG;;
+        L) export ITEM_LOGDIR=$OPTARG;;
+        p) export ITEM_PORT=$OPTARG;;
+        u) export ITEM_USER=$OPTARG;;
         s) status;;
         h) usage;;
         ':') die "missing arg: $opt $OPTARG";;
