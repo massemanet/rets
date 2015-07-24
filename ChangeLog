@@ -1,9 +1,26 @@
-commit d000a9e72a3fbe6767795a0ebfdf71a64b6ea15b
+commit 319d7bb1f895ffd733709c7f8db514e6c9b02df5
+Author: mats cronqvist <masse@klarna.com>
+Date:   Fri Jul 24 14:07:59 2015 +0200
+
+    v0.10.6
+
+src/rets.app.src
+
+commit 5244118715221b25fc9c666d56df7294c0adca16
+Author: mats cronqvist <mats.cronqvist@gmail.com>
+Date:   Mon Jul 20 16:30:39 2015 +0200
+
+    export vars that need to be exported in rets.sh
+
+bin/rets.sh
+
+commit 9ff86129345591f1f1ab3a0bf9471ac6bf2039d8
 Author: mats cronqvist <mats.cronqvist@gmail.com>
 Date:   Fri Jul 3 11:26:22 2015 +0200
 
     v0.10.5
 
+ChangeLog
 src/rets.app.src
 
 commit 9e01aa226998abb0a4eabf7a33e14f03822efce1
