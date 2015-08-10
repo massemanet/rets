@@ -448,8 +448,8 @@ t15(SETUP) ->
 
   %% After restart: both tables should be saved to disk
   SETUP(keep),
-  ?assertEqual({ok,["tebbe","tibbe"]},
-               file:list_dir(filename:join("/tmp/rets/db",SETUP(backend)))),
+  ?assertEqual(["tebbe","tibbe"],
+               ls(filename:join("/tmp/rets/db",SETUP(backend)))),
 
   %% Delete one of the tables
   ?assertEqual({200,true},
@@ -459,7 +459,13 @@ t15(SETUP) ->
 
   %% After restart: only one table should be saved to disk
   SETUP(keep),
-  ?assertEqual({ok,["tebbe"]},
-               file:list_dir(filename:join("/tmp/rets/db",SETUP(backend)))).
+  ?assertEqual(["tebbe"],
+               ls(filename:join("/tmp/rets/db",SETUP(backend)))).
+
+ls(Dir) ->
+  case file:list_dir(Dir) of
+    {ok,Files} -> lists:sort(Files);
+    _ -> []
+  end.
 
 -endif. % TEST
