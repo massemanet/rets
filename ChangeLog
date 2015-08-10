@@ -1,9 +1,26 @@
-commit 319d7bb1f895ffd733709c7f8db514e6c9b02df5
+commit 1dc07ed626c84a5b4c2f970b5010796fe6afe07f
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Aug 10 10:30:32 2015 +0200
+
+    v0.10.7
+
+src/rets.app.src
+
+commit ca108b45b2d2b3025921f2e7ceddb656c3d8b3a0
+Author: mats cronqvist <masse@klarna.com>
+Date:   Mon Aug 10 10:30:07 2015 +0200
+
+    donm't rely on sorting property offile:list_dir
+
+src/rets_eunit.erl
+
+commit 840484ce36862d5b19d3fd6af9245f99e5f51fb3
 Author: mats cronqvist <masse@klarna.com>
 Date:   Fri Jul 24 14:07:59 2015 +0200
 
     v0.10.6
 
+ChangeLog
 src/rets.app.src
 
 commit 5244118715221b25fc9c666d56df7294c0adca16
