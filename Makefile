@@ -57,12 +57,12 @@ xref: compile-all
 	@$(REBAR) compile xref skip_deps=true
 
 ~/.dialyzer_plt:
-	-dialyzer --output_plt ${@} --build_plt \
+	-dialyzer -nn --output_plt ${@} --build_plt \
            --apps erts kernel stdlib crypto ssl public_key inets \
                   eunit xmerl compiler runtime_tools mnesia syntax_tools
 
 deps/.dialyzer_plt: ~/.dialyzer_plt
-	-dialyzer -nn --no_spec \
+	-dialyzer -nn \
           --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
 
 dialyze: deps/.dialyzer_plt
