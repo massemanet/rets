@@ -1,25 +1,19 @@
 ## -*- mode: Makefile; fill-column: 80; comment-column: 67; -*-
 
-REBAR   ?= $(shell which rebar 2> /dev/null || which ./rebar)
+REBAR ?= $(shell which rebar 2> /dev/null || which ./rebar)
 
-.PHONY: all compile compile-all get-deps update-deps clean test
+.PHONY: all compile deps clean test
 .PHONY: release release_patch release_minor release_major
 .PHONY: eunit xref dialyze readme
 
 all: compile
 
-compile: get-deps
+compile:
 	@$(REBAR) compile skip_deps=true
 
-compile-all: get-deps
-	@$(REBAR) compile
-
-get-deps:
-	@$(REBAR) get-deps
-
-update-deps:
+deps:
 	@$(REBAR) update-deps
-	@$(REBAR) get-deps
+	@$(REBAR) compile
 
 clean:
 	@find . -name "*~" -exec rm {} \;
@@ -30,13 +24,13 @@ test: readme eunit xref dialyze
 #############################################################################
 ## release stuff
 
-release_major: test
+release_major: deps test
 	./bin/release.sh major
 
-release_minor: test
+release_minor: deps test
 	./bin/release.sh minor
 
-release_patch: test
+release_patch: deps test
 	./bin/release.sh patch
 
 release: release_patch
@@ -44,17 +38,21 @@ release: release_patch
 #############################################################################
 ## testing
 
-readme:
+readme: compile
 	./bin/rets.sh -l . -d /tmp/rets/db restart
 	sleep 1
 	./bin/make_readme
 	./bin/rets.sh stop
 
-eunit: compile-all
+eunit: compile
 	@$(REBAR) eunit skip_deps=true
 
-xref: compile-all
-	@$(REBAR) compile xref skip_deps=true
+xref: compile
+	@$(REBAR) xref skip_deps=true
+
+dialyze: compile ~/.dialyzer_plt deps/.dialyzer_plt
+	$(shell [ -d .eunit ] && rm -rf .eunit)
+	dialyzer ebin -nn -Wno_return --plt deps/.dialyzer_plt
 
 ~/.dialyzer_plt:
 	-dialyzer -nn --output_plt ${@} --build_plt \
@@ -64,7 +62,3 @@ xref: compile-all
 deps/.dialyzer_plt: ~/.dialyzer_plt
 	-dialyzer -nn \
           --add_to_plt --plt ~/.dialyzer_plt --output_plt ${@} -r deps
-
-dialyze: deps/.dialyzer_plt
-	$(shell [ -d .eunit ] && rm -rf .eunit)
-	dialyzer ebin -nn --no_spec --plt deps/.dialyzer_plt
