@@ -1,9 +1,42 @@
-commit 1dc07ed626c84a5b4c2f970b5010796fe6afe07f
+commit 0dffff087c130cd2a44d647063eea84ac5c08f82
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 12 13:26:46 2015 +0100
+
+    v0.10.8
+
+src/rets.app.src
+
+commit 12b3f92d3377f8bf2a1c2f24da50abe0354bd39b
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Nov 12 13:26:10 2015 +0100
+
+    Makefile makeover
+
+Makefile
+
+commit 8d72a03b0e197ca06fd051863dcc7da7f781b4ad
+Author: Dániel Szoboszlay <daniel.szoboszlay@klarna.com>
+Date:   Wed Nov 11 16:44:50 2015 +0100
+
+    Fix reading of long request bodies
+
+src/rets.erl
+
+commit 13c963ed9b16015373c7f7fcae96af223750b7c8
+Author: mats cronqvist <masse@klarna.com>
+Date:   Thu Oct 22 10:15:31 2015 +0200
+
+    tweaked Makefile
+
+Makefile
+
+commit e9e42600475400b4d8957a82bc264b42b36d5daa
 Author: mats cronqvist <masse@klarna.com>
 Date:   Mon Aug 10 10:30:32 2015 +0200
 
     v0.10.7
 
+ChangeLog
 src/rets.app.src
 
 commit ca108b45b2d2b3025921f2e7ceddb656c3d8b3a0
