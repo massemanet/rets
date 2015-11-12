@@ -59,12 +59,13 @@ terminate(_Reason, _Req, _State) ->
 handle(Req,State) ->
   {ok,mk_reply(Req),State}.
 
-mk_reply(Req) ->
+mk_reply(Req0) ->
+  {Body, Req} = body(Req0),
   try
-    cow_reply(200,<<"application/json">>,je(reply(Req)),Req)
+    cow_reply(200,<<"application/json">>,je(reply(Req, Body)),Req)
   catch
     throw:{Status,R} ->
-      cow_reply(Status,<<"text/plain">>,reply(Status,R),Req)
+      cow_reply(Status,<<"text/plain">>,error_reply(Status,R),Req)
   end.
 
 cow_reply(Status,ContentType,Body,Req) ->
@@ -72,17 +73,17 @@ cow_reply(Status,ContentType,Body,Req) ->
   {ok,Rq} = cowboy_req:reply(Status,Headers,Body,Req),
   Rq.
 
-reply(404,R) -> flat(R);
-reply(405,R) -> flat(R);
-reply(409,R) -> flat(R);
-reply(500,R) -> flat({R,erlang:get_stacktrace()}).
+error_reply(404,R) -> flat(R);
+error_reply(405,R) -> flat(R);
+error_reply(409,R) -> flat(R);
+error_reply(500,R) -> flat({R,erlang:get_stacktrace()}).
 
-reply(Req) ->
-  x(method(Req),uri(Req),rets_headers(Req),Req).
+reply(Req, Body) ->
+  x(method(Req),uri(Req),rets_headers(Req),Body).
 
 x("PUT",   [Tab]    ,[],_)             -> g({create,[Tab]});
 x("PUT",   [Tab|Key],["indirect",T],_) -> g({via,   [Tab,chkk(Key),T]});
-x("PUT",   [Tab|Key],[],R)             -> g({insert,[Tab,chkk(Key),body(R)]});
+x("PUT",   [Tab|Key],[],B)             -> g({insert,[Tab,chkk(Key),B]});
 x("PUT",   [Tab|Key],["counter"],_)    -> g({bump,  [Tab,chkk(Key),1]});
 x("PUT",   [Tab|Key],["counter",L,H],_)-> g({bump,  [Tab,chkk(Key),i(L),i(H)]});
 x("PUT",   [Tab|Key],["reset"],_)      -> g({reset, [Tab,chkk(Key),0]});
@@ -94,7 +95,7 @@ x("GET",   [Tab|Key],["multi"],_)      -> g({multi, [Tab,Key]});
 x("GET",   [Tab|Key],["next"],_)       -> g({next,  [Tab,Key]});
 x("GET",   [Tab|Key],["prev"],_)       -> g({prev,  [Tab,Key]});
 x("GET",   _        ,Headers,_)        -> throw({405,{"bad header",Headers}});
-x("POST",  [Tab]    ,[],R)             -> g({insert,[Tab,chkb(body(R))]});
+x("POST",  [Tab]    ,[],B)             -> g({insert,[Tab,chkb(B)]});
 x("DELETE",[Tab]    ,[],_)             -> g({delete,[Tab]});
 x("DELETE",[Tab|Key],[],_)             -> g({delete,[Tab,Key]});
 x("TRACE",_,_,_)                       -> throw({405,"method not allowed"});
@@ -122,12 +123,12 @@ i(Str) ->
 body(Req) ->
   case cowboy_req:has_body(Req) of
     true ->
-      {ok,Body,_} = cowboy_req:body(Req),
+      {ok,Body,NewReq} = cowboy_req:body(Req),
       case jd(Body) of
-        <<>> -> [];
-        B    -> B
+        <<>> -> {[], NewReq};
+        B    -> {B, NewReq}
       end;
-    false-> []
+    false-> {[], Req}
   end.
 
 method(Req) ->
