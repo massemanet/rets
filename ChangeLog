@@ -1,9 +1,28 @@
-commit 0dffff087c130cd2a44d647063eea84ac5c08f82
+commit 50d74f816a28362115cca3b27413119f1d4368bc
+Author: mats cronqvist <masse@cronqvi.st>
+Date:   Wed Jul 20 13:57:25 2016 +0200
+
+    v0.10.9
+
+src/rets.app.src
+
+commit b47e660bf9cdd61c69341192b8f1986a00738fe5
+Author: mats cronqvist <masse@klarna.com>
+Date:   Wed Jul 20 13:50:58 2016 +0200
+
+    lock down versions of deps
+
+rebar.config
+src/rets_readme.erl
+
+commit 157fa07adf22ab259a4a1fa7d4d025807776481a
 Author: mats cronqvist <masse@klarna.com>
 Date:   Thu Nov 12 13:26:46 2015 +0100
 
     v0.10.8
 
+AUTHORS
+ChangeLog
 src/rets.app.src
 
 commit 12b3f92d3377f8bf2a1c2f24da50abe0354bd39b
