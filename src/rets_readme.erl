@@ -33,6 +33,7 @@ wildcards.
 
 mk_go_fun(FD) ->
   fun({T,C,A}) ->
+      receive after 200 -> ok end,
       R = os:cmd(C),
       case R of
         A ->
