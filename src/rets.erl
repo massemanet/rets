@@ -60,12 +60,12 @@ handle(Req,State) ->
   {ok,mk_reply(Req),State}.
 
 mk_reply(Req0) ->
-  {Body, Req} = body(Req0),
   try
+    {Body, Req} = body(Req0),
     cow_reply(200,<<"application/json">>,je(reply(Req, Body)),Req)
   catch
     throw:{Status,R} ->
-      cow_reply(Status,<<"text/plain">>,error_reply(Status,R),Req)
+      cow_reply(Status,<<"text/plain">>,error_reply(Status,R),Req0)
   end.
 
 cow_reply(Status,ContentType,Body,Req) ->
@@ -73,6 +73,7 @@ cow_reply(Status,ContentType,Body,Req) ->
   {ok,Rq} = cowboy_req:reply(Status,Headers,Body,Req),
   Rq.
 
+error_reply(400,R) -> flat(R);
 error_reply(404,R) -> flat(R);
 error_reply(405,R) -> flat(R);
 error_reply(409,R) -> flat(R);
@@ -173,7 +174,7 @@ flat(Term) ->
 %% a nif that throws? insanity.
 jd(Term) ->
   try jiffy:decode(Term)
-  catch {error,R} -> error({R,Term})
+  catch {error,_} -> throw({400,"illegal json in body"})
   end.
 
 %% a nif that throws? insanity.
